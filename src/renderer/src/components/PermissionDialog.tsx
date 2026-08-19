@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store'
 
 export default function PermissionDialog() {
+  const { t } = useTranslation()
   const { permissionRequest, respondPermission } = useAppStore()
 
   if (!permissionRequest) return null
@@ -10,9 +12,9 @@ export default function PermissionDialog() {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-bg-panel border border-border rounded-xl shadow-2xl max-w-md w-full mx-4 p-5">
-        <h3 className="text-sm font-bold text-text-primary mb-3">Permission Request</h3>
+        <h3 className="text-sm font-bold text-text-primary mb-3">{t('permission.title')}</h3>
         <p className="text-sm text-text-secondary mb-4">
-          The agent wants to execute a tool that may modify your system:
+          {t('permission.description')}
         </p>
 
         <div className="bg-bg-card rounded-lg p-3 mb-4 border border-border">
@@ -27,13 +29,13 @@ export default function PermissionDialog() {
             onClick={() => respondPermission(true)}
             className="btn-primary flex-1"
           >
-            Allow
+            {t('permission.allow')}
           </button>
           <button
             onClick={() => respondPermission(false)}
             className="btn-danger flex-1"
           >
-            Deny
+            {t('permission.deny')}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useAppStore } from './store'
+import i18n, { getEffectiveLanguage, storeLanguage, type AppLanguage } from './i18n'
 import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import SettingsView from './components/SettingsView'
@@ -16,7 +17,16 @@ export default function App() {
         setActiveSession(sessions[0].id)
       }
     })
-    loadSettings()
+    // 加载设置后同步语言（DB 为权威来源）
+    loadSettings().then(() => {
+      const { settings } = useAppStore.getState()
+      if (settings.language) {
+        const lang = settings.language as AppLanguage
+        const effective = getEffectiveLanguage(lang)
+        storeLanguage(lang)
+        i18n.changeLanguage(effective)
+      }
+    })
   }, [])
 
   // 注册 IPC 事件

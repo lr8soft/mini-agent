@@ -1,0 +1,117 @@
+// Español
+export default {
+  app: {
+    name: 'MiniAgent'
+  },
+  sidebar: {
+    newSession: 'Nueva sesión',
+    noSessions: 'Sin sesiones',
+    deleteSession: 'Eliminar sesión',
+    settings: 'Configuración'
+  },
+  chat: {
+    createSessionToStart: 'Crea una sesión para empezar a chatear',
+    newSession: 'Nueva Sesión',
+    session: 'Sesión',
+    autoApproveOn: 'Auto-Aprobar: ON',
+    autoApproveOff: 'Auto-Aprobar: OFF',
+    autoApproveOnHint: 'Auto-aprobar ON: todas las llamadas omiten permisos',
+    autoApproveOffHint: 'Auto-aprobar OFF: las herramientas requieren permiso',
+    thinking: 'Pensando...',
+    stop: 'Detener',
+    send: 'Enviar',
+    welcome: 'Escribe un mensaje abajo para iniciar una conversación.',
+    welcomeHint: 'El agente puede leer archivos, ejecutar comandos y usar herramientas MCP.',
+    inputPlaceholder: 'Envía un mensaje... (Enter para enviar, Shift+Enter para nueva línea)',
+    defaultModel: '(Modelo por defecto)',
+    selectModelHint: 'Seleccionar modelo (vacío = default del proveedor)',
+    modelDefaultSuffix: '(por defecto)'
+  },
+  permission: {
+    title: 'Solicitud de Permiso',
+    description: 'El agente quiere ejecutar una herramienta que puede modificar tu sistema:',
+    allow: 'Permitir',
+    deny: 'Denegar'
+  },
+  message: {
+    error: 'Error',
+    collapse: 'Colapsar',
+    expand: 'Expandir'
+  },
+  settings: {
+    title: 'Configuración',
+    tabs: {
+      providers: 'Proveedores LLM',
+      mcp: 'Servidores MCP',
+      skills: 'Skills',
+      memory: 'Memoria',
+      general: 'General'
+    },
+    save: 'Guardar Configuración',
+    providers: {
+      hint: 'Configura proveedores LLM. Cualquier endpoint compatible con OpenAI funciona (Ollama, vLLM, OpenAI, Anthropic, etc.).',
+      zhuminetBanner: 'Servicio de API de modelos de IA, registro con crédito gratis',
+      zhuminetRegister: 'Registrarse →',
+      name: 'Nombre',
+      defaultModel: 'Modelo por Defecto',
+      baseUrl: 'Base URL',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: '(opcional para local)',
+      enabled: 'Habilitado',
+      temperature: 'Temperatura',
+      temperatureHint: 'Por defecto 1.0. Bajo = enfocado, alto = creativo.',
+      temperatureReset: 'Restablecer',
+      reasoningEffort: 'Intensidad de Razonamiento',
+      reasoningLow: 'bajo — rápido, menos pensamiento',
+      reasoningMedium: 'medio — equilibrado',
+      reasoningHigh: 'alto — razonamiento profundo',
+      addProvider: '+ Añadir Proveedor',
+      remove: 'Eliminar',
+      active: 'Activo',
+      activate: 'Click para activar'
+    },
+    mcp: {
+      hint: 'Configura servidores MCP (Model Context Protocol) para capacidades extendidas.',
+      name: 'Nombre',
+      type: 'Tipo',
+      command: 'Comando',
+      commandHint: 'Solo ejecutable. Pon flags/rutas en Args abajo.',
+      args: 'Args (separados por espacios)',
+      env: 'Env (KEY=VALUE, uno por línea)',
+      url: 'URL',
+      addServer: '+ Añadir Servidor MCP',
+      remove: 'Eliminar'
+    },
+    skills: {
+      hint: 'Carga archivos SKILL.md para inyectar prompts especializados al agente.',
+      addSkill: '+ Añadir Skill (seleccionar .md)',
+      on: 'On',
+      off: 'Off',
+      remove: 'Eliminar'
+    },
+    memory: {
+      hint: 'Entradas de memoria a largo plazo capturadas automáticamente de conversaciones. El agente las usa para personalizar respuestas.',
+      clearAll: 'Limpiar Todo',
+      searchPlaceholder: 'Buscar memorias...',
+      allCategories: 'Todas las Categorías',
+      noMemories: 'Sin memorias aún. Se capturarán automáticamente al chatear con el agente.',
+      noMatch: 'No hay memorias que coincidan con el filtro.',
+      delete: 'Eliminar',
+      accessed: 'Accedido',
+      times: 'x',
+      preference: 'Preferencia',
+      habit: 'Hábito',
+      fact: 'Hecho',
+      skill: 'Habilidad',
+      context: 'Contexto'
+    },
+    general: {
+      workspacePath: 'Ruta del Workspace',
+      browse: 'Examinar',
+      workspaceHint: 'Directorio raíz de trabajo del agente. Las herramientas de archivo son relativas a esta ruta.',
+      language: 'Idioma',
+      languageHint: 'Idioma de interfaz. Detecta automáticamente el idioma del sistema en el primer inicio.',
+      autoDetect: 'Auto (Sistema)'
+    }
+  }
+}

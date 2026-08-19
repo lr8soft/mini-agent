@@ -1,0 +1,117 @@
+// 日本語
+export default {
+  app: {
+    name: 'MiniAgent'
+  },
+  sidebar: {
+    newSession: '新しいセッション',
+    noSessions: 'セッションがありません',
+    deleteSession: 'セッションを削除',
+    settings: '設定'
+  },
+  chat: {
+    createSessionToStart: 'チャットを開始するにはセッションを作成してください',
+    newSession: '新しいセッション',
+    session: 'セッション',
+    autoApproveOn: '自動承認: オン',
+    autoApproveOff: '自動承認: オフ',
+    autoApproveOnHint: '自動承認オン: すべてのツール呼び出しが権限確認をスキップ',
+    autoApproveOffHint: '自動承認オフ: ツールに権限が必要',
+    thinking: '考え中...',
+    stop: '停止',
+    send: '送信',
+    welcome: '下にメッセージを入力して会話を開始してください。',
+    welcomeHint: 'エージェントはファイルの読み取り、コマンドの実行、MCPツールの使用が可能です。',
+    inputPlaceholder: 'メッセージを送信... (Enter で送信、Shift+Enter で改行)',
+    defaultModel: '(デフォルトモデル)',
+    selectModelHint: 'モデルを選択 (空 = プロバイダーのデフォルト)',
+    modelDefaultSuffix: '(デフォルト)'
+  },
+  permission: {
+    title: '権限リクエスト',
+    description: 'エージェントがシステムを変更する可能性のあるツールを実行しようとしています：',
+    allow: '許可',
+    deny: '拒否'
+  },
+  message: {
+    error: 'エラー',
+    collapse: '折りたたむ',
+    expand: '展開'
+  },
+  settings: {
+    title: '設定',
+    tabs: {
+      providers: 'LLM プロバイダー',
+      mcp: 'MCP サーバー',
+      skills: 'スキル',
+      memory: 'メモリ',
+      general: '一般'
+    },
+    save: '設定を保存',
+    providers: {
+      hint: 'LLM プロバイダーを設定。OpenAI 互換のエンドポイントなら何でも動作します (Ollama, vLLM, OpenAI, Anthropic など)。',
+      zhuminetBanner: 'AI モデル API サービス、登録で無料枠付き',
+      zhuminetRegister: '登録へ →',
+      name: '名前',
+      defaultModel: 'デフォルトモデル',
+      baseUrl: 'Base URL',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: '(ローカルは省略可)',
+      enabled: '有効',
+      temperature: '温度',
+      temperatureHint: 'デフォルト 1.0。低 = 集中、高 = 創造的。',
+      temperatureReset: 'リセット',
+      reasoningEffort: '推論強度',
+      reasoningLow: '低 — 高速、少ない思考',
+      reasoningMedium: '中 — バランス',
+      reasoningHigh: '高 — 深い推論',
+      addProvider: '+ プロバイダーを追加',
+      remove: '削除',
+      active: 'アクティブ',
+      activate: 'クリックしてアクティブ化'
+    },
+    mcp: {
+      hint: 'MCP (Model Context Protocol) サーバーを設定してツール機能を拡張。',
+      name: '名前',
+      type: 'タイプ',
+      command: 'コマンド',
+      commandHint: '実行ファイルのみ。フラグ/パスは下の Args に。',
+      args: '引数 (スペース区切り)',
+      env: '環境変数 (KEY=VALUE, 1行1つ)',
+      url: 'URL',
+      addServer: '+ MCP サーバーを追加',
+      remove: '削除'
+    },
+    skills: {
+      hint: 'SKILL.md ファイルをロードしてエージェントに専門プロンプトを注入。',
+      addSkill: '+ スキルを追加 (.md ファイルを選択)',
+      on: 'オン',
+      off: 'オフ',
+      remove: '削除'
+    },
+    memory: {
+      hint: '会話から自動的にキャプチャされた長期メモリ。エージェントはこれらを使用して応答を個別化します。',
+      clearAll: 'すべて消去',
+      searchPlaceholder: 'メモリを検索...',
+      allCategories: 'すべてのカテゴリ',
+      noMemories: 'メモリがありません。エージェントとの会話で自動的にキャプチャされます。',
+      noMatch: 'フィルターに一致するメモリがありません。',
+      delete: '削除',
+      accessed: 'アクセス',
+      times: '回',
+      preference: '設定',
+      habit: '習慣',
+      fact: '事実',
+      skill: 'スキル',
+      context: 'コンテキスト'
+    },
+    general: {
+      workspacePath: 'ワークスペースパス',
+      browse: '参照',
+      workspaceHint: 'エージェントが作業するルートディレクトリ。ファイルツールはこのパスに相対。',
+      language: '言語',
+      languageHint: 'インターフェース言語。初回起動時にシステム言語を自動検出。',
+      autoDetect: '自動 (システム)'
+    }
+  }
+}

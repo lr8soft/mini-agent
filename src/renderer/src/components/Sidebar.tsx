@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store'
 
 export default function Sidebar() {
+  const { t } = useTranslation()
   const { sessions, activeSessionId, setActiveSession, createSession, deleteSession, setView, view } = useAppStore()
 
   return (
@@ -8,12 +10,12 @@ export default function Sidebar() {
       {/* 头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <h1 className="text-sm font-bold tracking-wide text-text-primary">
-          MiniAgent
+          {t('app.name')}
         </h1>
         <button
           onClick={createSession}
           className="text-text-muted hover:text-accent-glow transition-colors text-lg"
-          title="New session"
+          title={t('sidebar.newSession')}
         >
           +
         </button>
@@ -22,7 +24,7 @@ export default function Sidebar() {
       {/* 会话列表 */}
       <div className="flex-1 overflow-y-auto py-2">
         {sessions.length === 0 && (
-          <p className="text-xs text-text-muted text-center py-8">No sessions yet</p>
+          <p className="text-xs text-text-muted text-center py-8">{t('sidebar.noSessions')}</p>
         )}
         {sessions.map((s) => (
           <div
@@ -39,7 +41,7 @@ export default function Sidebar() {
             <button
               className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-err transition-opacity text-xs"
               onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
-              title="Delete session"
+              title={t('sidebar.deleteSession')}
             >
               ✕
             </button>
@@ -55,7 +57,7 @@ export default function Sidebar() {
             view === 'settings' ? 'bg-bg-hover text-accent-glow' : ''
           }`}
         >
-          ⚙ Settings
+          ⚙ {t('sidebar.settings')}
         </button>
       </div>
     </aside>

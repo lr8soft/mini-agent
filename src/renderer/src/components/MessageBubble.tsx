@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import type { UIMessage } from '@shared/types'
 import ReactMarkdown from 'react-markdown'
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function MessageBubble({ message }: Props) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
   const isTool = message.role === 'tool'
   const hasToolCalls = message.toolCalls && message.toolCalls.length > 0
@@ -46,12 +48,12 @@ export default function MessageBubble({ message }: Props) {
       {!isUser && !isTool && message.content && (
         <div className="max-w-[90%]">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono text-accent-glow">MiniAgent</span>
+            <span className="text-xs font-mono text-accent-glow">{t('app.name')}</span>
             {message.status === 'streaming' && (
               <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
             )}
             {message.status === 'error' && (
-              <span className="text-err text-xs">Error</span>
+              <span className="text-err text-xs">{t('message.error')}</span>
             )}
           </div>
           <div className="markdown-body">
@@ -64,6 +66,7 @@ export default function MessageBubble({ message }: Props) {
 }
 
 function ToolResultBubble({ message }: { message: UIMessage }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = React.useState(false)
   const lines = message.content.split('\n')
   const isLong = lines.length > 8
@@ -79,7 +82,7 @@ function ToolResultBubble({ message }: { message: UIMessage }) {
           onClick={() => setExpanded(!expanded)}
           className="text-text-muted hover:text-text-primary transition-colors"
         >
-          {isLong ? (expanded ? 'Collapse' : 'Expand') : ''}
+          {isLong ? (expanded ? t('message.collapse') : t('message.expand')) : ''}
         </button>
       </div>
       <pre className="p-3 overflow-x-auto text-text-secondary max-h-[400px] font-mono whitespace-pre-wrap">

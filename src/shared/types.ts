@@ -104,6 +104,8 @@ export interface AppSettings {
   workspacePath: string
   /** 长期记忆功能开关 */
   memoryEnabled?: boolean
+  /** 界面语言 ('auto' 时跟随系统) */
+  language?: string
 }
 
 // ============================================================

@@ -1,0 +1,117 @@
+// 中文
+export default {
+  app: {
+    name: 'MiniAgent'
+  },
+  sidebar: {
+    newSession: '新建会话',
+    noSessions: '暂无会话',
+    deleteSession: '删除会话',
+    settings: '设置'
+  },
+  chat: {
+    createSessionToStart: '创建会话开始对话',
+    newSession: '新建会话',
+    session: '会话',
+    autoApproveOn: '自动批准: 开',
+    autoApproveOff: '自动批准: 关',
+    autoApproveOnHint: '自动批准已开启：所有工具调用跳过权限确认',
+    autoApproveOffHint: '自动批准已关闭：工具调用需要权限确认',
+    thinking: '思考中...',
+    stop: '停止',
+    send: '发送',
+    welcome: '在下方输入消息开始对话。',
+    welcomeHint: 'Agent 可以读取文件、运行命令、使用 MCP 工具。',
+    inputPlaceholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
+    defaultModel: '(默认模型)',
+    selectModelHint: '选择模型（留空 = 使用 Provider 默认）',
+    modelDefaultSuffix: '(默认)'
+  },
+  permission: {
+    title: '权限请求',
+    description: 'Agent 要执行一个可能修改你系统的操作：',
+    allow: '允许',
+    deny: '拒绝'
+  },
+  message: {
+    error: '错误',
+    collapse: '收起',
+    expand: '展开'
+  },
+  settings: {
+    title: '设置',
+    tabs: {
+      providers: 'LLM 提供商',
+      mcp: 'MCP 服务器',
+      skills: 'Skills',
+      memory: '记忆',
+      general: '通用'
+    },
+    save: '保存设置',
+    providers: {
+      hint: '配置 LLM 提供商。任意 OpenAI 兼容端点均可（Ollama、vLLM、OpenAI、Anthropic 等）。',
+      zhuminetBanner: '一站式 AI 模型 API 服务，注册即送免费额度',
+      zhuminetRegister: '前往注册 →',
+      name: '名称',
+      defaultModel: '默认模型',
+      baseUrl: 'Base URL',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: '(本地服务可留空)',
+      enabled: '启用',
+      temperature: '温度',
+      temperatureHint: '默认 1.0。低 = 聚焦，高 = 创意。',
+      temperatureReset: '重置',
+      reasoningEffort: '思考强度',
+      reasoningLow: '低 — 快速，少思考',
+      reasoningMedium: '中 — 平衡',
+      reasoningHigh: '高 — 深度推理',
+      addProvider: '+ 添加提供商',
+      remove: '移除',
+      active: '当前使用',
+      activate: '点击切换为当前'
+    },
+    mcp: {
+      hint: '配置 MCP (Model Context Protocol) 服务器以扩展工具能力。',
+      name: '名称',
+      type: '类型',
+      command: '命令',
+      commandHint: '仅可执行文件。参数/路径放在下方 Args 中。',
+      args: '参数 (空格分隔)',
+      env: '环境变量 (KEY=VALUE，每行一个)',
+      url: 'URL',
+      addServer: '+ 添加 MCP 服务器',
+      remove: '移除'
+    },
+    skills: {
+      hint: '加载 Skill 定义文件 (SKILL.md) 以注入专用提示词到 Agent。',
+      addSkill: '+ 添加 Skill (选择 .md 文件)',
+      on: '开',
+      off: '关',
+      remove: '移除'
+    },
+    memory: {
+      hint: '从对话中自动捕获的长期记忆条目。Agent 使用这些来个性化响应。',
+      clearAll: '全部清空',
+      searchPlaceholder: '搜索记忆...',
+      allCategories: '全部分类',
+      noMemories: '暂无记忆。随着与 Agent 的对话会自动捕获。',
+      noMatch: '没有匹配筛选条件的记忆。',
+      delete: '删除',
+      accessed: '访问',
+      times: '次',
+      preference: '偏好',
+      habit: '习惯',
+      fact: '事实',
+      skill: '技能',
+      context: '上下文'
+    },
+    general: {
+      workspacePath: '工作目录',
+      browse: '浏览',
+      workspaceHint: 'Agent 工作的根目录。文件工具都相对于此路径。',
+      language: '语言',
+      languageHint: '界面语言。首次启动时自动检测系统语言。',
+      autoDetect: '自动 (跟随系统)'
+    }
+  }
+}

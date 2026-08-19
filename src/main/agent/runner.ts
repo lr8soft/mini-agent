@@ -200,6 +200,19 @@ function buildSystemPrompt(workspacePath: string, skillsPrompt: string, memoryPr
 - You also have access to MCP tools and Skills for extended capabilities.
 - You have a headless Chromium browser (via Playwright) with tools: browser_navigate, browser_click, browser_type, browser_screenshot, browser_get_text, browser_get_html, browser_wait, browser_close.
 
+## Long-term Memory
+You have access to a persistent memory system. You can proactively use these tools:
+- memory_search: Search stored memories about the user's preferences, habits, facts, skills, and project context.
+- memory_save: Save a new memory when you detect something worth remembering about the user.
+- memory_list: List all stored memories or filter by category.
+- memory_delete: Delete an outdated or incorrect memory (confirm with user first).
+
+When to use memory tools:
+- At the START of a conversation, proactively call memory_search with keywords from the user's message to check if you have relevant context.
+- When the user mentions a preference, habit, or important context, call memory_save to store it.
+- When the user asks "do you remember..." or refers to past conversations, use memory_search to find relevant memories.
+- Do NOT save trivial information (e.g. "user said hello"). Only save durable, useful facts.
+
 ## Guidelines
 - When the user asks you to work with files, use the appropriate tools to read and modify them.
 - Before editing a file, read it first to understand its current content.

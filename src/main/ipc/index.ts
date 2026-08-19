@@ -10,6 +10,7 @@ import { log } from '../llm/provider'
 import { registerTool, clearTools } from '../tools/registry'
 import { builtinTools } from '../tools/builtin'
 import { browserTools } from '../tools/browser'
+import { memoryTools } from '../tools/memory'
 import { getToolPermission, type PermissionLevel } from '../tools/registry'
 import { reconnectAllMcpServers, connectMcpServer, disconnectMcpServer } from '../mcp/client'
 import { reloadSkills, getSkillsSystemPrompt } from '../skill/manager'
@@ -33,6 +34,10 @@ export function setupIpc(win: BrowserWindow): void {
   }
   // 注册浏览器工具
   for (const { name, handler } of browserTools) {
+    registerTool(name, handler, 'builtin')
+  }
+  // 注册记忆工具
+  for (const { name, handler } of memoryTools) {
     registerTool(name, handler, 'builtin')
   }
 

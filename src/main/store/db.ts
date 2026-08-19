@@ -188,7 +188,8 @@ function defaultSettings(): AppSettings {
     skills: [],
     activeProviderId: 'zhuminet-default',
     workspacePath: app.getPath('home'),
-    memoryEnabled: true
+    memoryEnabled: true,
+    language: 'auto'
   }
 }
 

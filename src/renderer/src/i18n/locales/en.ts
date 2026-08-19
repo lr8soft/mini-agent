@@ -1,0 +1,117 @@
+// English (baseline)
+export default {
+  app: {
+    name: 'MiniAgent'
+  },
+  sidebar: {
+    newSession: 'New session',
+    noSessions: 'No sessions yet',
+    deleteSession: 'Delete session',
+    settings: 'Settings'
+  },
+  chat: {
+    createSessionToStart: 'Create a session to start chatting',
+    newSession: 'New Session',
+    session: 'Session',
+    autoApproveOn: 'Auto-Approve: ON',
+    autoApproveOff: 'Auto-Approve: OFF',
+    autoApproveOnHint: 'Auto-approve ON: all tool calls skip permission',
+    autoApproveOffHint: 'Auto-approve OFF: tools need permission',
+    thinking: 'Thinking...',
+    stop: 'Stop',
+    send: 'Send',
+    welcome: 'Type a message below to start a conversation.',
+    welcomeHint: 'The agent can read files, run commands, and use MCP tools.',
+    inputPlaceholder: 'Send a message... (Enter to send, Shift+Enter for newline)',
+    defaultModel: '(Default Model)',
+    selectModelHint: 'Select model (empty = provider default)',
+    modelDefaultSuffix: '(default)'
+  },
+  permission: {
+    title: 'Permission Request',
+    description: 'The agent wants to execute a tool that may modify your system:',
+    allow: 'Allow',
+    deny: 'Deny'
+  },
+  message: {
+    error: 'Error',
+    collapse: 'Collapse',
+    expand: 'Expand'
+  },
+  settings: {
+    title: 'Settings',
+    tabs: {
+      providers: 'LLM Providers',
+      mcp: 'MCP Servers',
+      skills: 'Skills',
+      memory: 'Memory',
+      general: 'General'
+    },
+    save: 'Save Settings',
+    providers: {
+      hint: 'Configure LLM providers. Any OpenAI-compatible endpoint works (Ollama, vLLM, OpenAI, Anthropic, etc.).',
+      zhuminetBanner: '一站式 AI 模型 API 服务，注册即送免费额度',
+      zhuminetRegister: '前往注册 →',
+      name: 'Name',
+      defaultModel: 'Default Model',
+      baseUrl: 'Base URL',
+      apiKey: 'API Key',
+      apiKeyPlaceholder: '(optional for local)',
+      enabled: 'Enabled',
+      temperature: 'Temperature',
+      temperatureHint: 'Leave at 1.0 for default. Lower = focused, higher = creative.',
+      temperatureReset: 'Reset',
+      reasoningEffort: 'Reasoning Effort',
+      reasoningLow: 'low — fast, less thinking',
+      reasoningMedium: 'medium — balanced',
+      reasoningHigh: 'high — deep reasoning',
+      addProvider: '+ Add Provider',
+      remove: 'Remove',
+      active: 'Active',
+      activate: 'Click to activate'
+    },
+    mcp: {
+      hint: 'Configure MCP (Model Context Protocol) servers for extended tool capabilities.',
+      name: 'Name',
+      type: 'Type',
+      command: 'Command',
+      commandHint: 'Executable only. Put flags/paths in Args below.',
+      args: 'Args (space-separated)',
+      env: 'Env (KEY=VALUE, one per line)',
+      url: 'URL',
+      addServer: '+ Add MCP Server',
+      remove: 'Remove'
+    },
+    skills: {
+      hint: 'Load Skill definitions (SKILL.md files) to inject specialized prompts into the agent.',
+      addSkill: '+ Add Skill (pick .md file)',
+      on: 'On',
+      off: 'Off',
+      remove: 'Remove'
+    },
+    memory: {
+      hint: 'Long-term memory entries automatically captured from conversations. The agent uses these to personalize responses.',
+      clearAll: 'Clear All',
+      searchPlaceholder: 'Search memories...',
+      allCategories: 'All Categories',
+      noMemories: 'No memories yet. They will be automatically captured as you chat with the agent.',
+      noMatch: 'No memories match your filter.',
+      delete: 'Delete',
+      accessed: 'Accessed',
+      times: 'x',
+      preference: 'Preference',
+      habit: 'Habit',
+      fact: 'Fact',
+      skill: 'Skill',
+      context: 'Context'
+    },
+    general: {
+      workspacePath: 'Workspace Path',
+      browse: 'Browse',
+      workspaceHint: 'The root directory the agent will work in. File tools are relative to this path.',
+      language: 'Language',
+      languageHint: 'Interface language. Auto-detects system language on first launch.',
+      autoDetect: 'Auto (System)'
+    }
+  }
+}

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
 
 export default function ChatView() {
+  const { t } = useTranslation()
   const { messages, isRunning, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedModel, setSelectedModel, autoApprove, setAutoApprove } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -48,9 +50,9 @@ export default function ChatView() {
       <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
         <div className="text-center">
           <p className="text-2xl mb-3">⌬</p>
-          <p className="mb-4">Create a session to start chatting</p>
+          <p className="mb-4">{t('chat.createSessionToStart')}</p>
           <button onClick={() => useAppStore.getState().createSession()} className="btn-primary">
-            New Session
+            {t('chat.newSession')}
           </button>
         </div>
       </div>
@@ -62,9 +64,9 @@ export default function ChatView() {
       {/* 顶部栏 */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-bg-panel/50">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">Session</span>
+          <span className="text-xs text-text-muted">{t('chat.session')}</span>
           <span className="text-sm text-text-primary truncate max-w-xs">
-            {sessions.find(s => s.id === activeSessionId)?.title || 'New Session'}
+            {sessions.find(s => s.id === activeSessionId)?.title || t('chat.newSession')}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -76,15 +78,15 @@ export default function ChatView() {
                 ? 'bg-accent/20 border-accent text-accent-glow'
                 : 'border-border text-text-muted hover:text-text-primary'
             }`}
-            title={autoApprove ? 'Auto-approve ON: all tool calls skip permission' : 'Auto-approve OFF: tools need permission'}
+            title={autoApprove ? t('chat.autoApproveOnHint') : t('chat.autoApproveOffHint')}
           >
-            {autoApprove ? 'Auto-Approve: ON' : 'Auto-Approve: OFF'}
+            {autoApprove ? t('chat.autoApproveOn') : t('chat.autoApproveOff')}
           </button>
           {isRunning && (
             <>
               <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-xs text-text-muted">Thinking...</span>
-              <button onClick={abortAgent} className="btn-danger text-xs">Stop</button>
+              <span className="text-xs text-text-muted">{t('chat.thinking')}</span>
+              <button onClick={abortAgent} className="btn-danger text-xs">{t('chat.stop')}</button>
             </>
           )}
         </div>
@@ -95,9 +97,9 @@ export default function ChatView() {
         {messages.length === 0 && (
           <div className="text-center text-text-muted text-sm py-20">
             <p className="text-3xl mb-4">⌬</p>
-            <p className="text-base font-medium text-text-primary mb-2">MiniAgent</p>
-            <p>Type a message below to start a conversation.</p>
-            <p className="mt-1 text-xs">The agent can read files, run commands, and use MCP tools.</p>
+            <p className="text-base font-medium text-text-primary mb-2">{t('app.name')}</p>
+            <p>{t('chat.welcome')}</p>
+            <p className="mt-1 text-xs">{t('chat.welcomeHint')}</p>
           </div>
         )}
         {messages.map((msg) => (
@@ -113,7 +115,7 @@ export default function ChatView() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Send a message... (Enter to send, Shift+Enter for newline)"
+            placeholder={t('chat.inputPlaceholder')}
             className="input-field flex-1 resize-none min-h-[42px] max-h-[200px] font-mono text-sm"
             rows={1}
             disabled={isRunning}
@@ -123,15 +125,15 @@ export default function ChatView() {
             className="input-field h-[42px] text-sm min-w-[140px]"
             value={selectedModel || ''}
             onChange={(e) => setSelectedModel(e.target.value || null)}
-            title="Select model (empty = provider default)"
+            title={t('chat.selectModelHint')}
           >
-            <option value="">(Default Model)</option>
+            <option value="">{t('chat.defaultModel')}</option>
             {settings.providers
               .filter(p => p.enabled)
               .map(p => (
                 <optgroup key={p.id} label={p.name}>
                   {/* 默认模型 */}
-                  <option value={p.defaultModel}>{p.defaultModel} (default)</option>
+                  <option value={p.defaultModel}>{p.defaultModel} {t('chat.modelDefaultSuffix')}</option>
                   {/* 如果有其他模型可以在这里加 */}
                 </optgroup>
               ))}
@@ -141,7 +143,7 @@ export default function ChatView() {
             disabled={!input.trim() || isRunning}
             className="btn-primary h-[42px] px-5"
           >
-            Send
+            {t('chat.send')}
           </button>
         </div>
       </div>

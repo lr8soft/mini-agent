@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../store'
 import type { ProviderConfig, McpServerConfig, SkillConfig, MemoryEntry, MemoryCategory } from '@shared/types'
+import { SUPPORTED_LANGUAGES, type AppLanguage, getEffectiveLanguage, storeLanguage } from '../i18n'
 
 export default function SettingsView() {
+  const { t } = useTranslation()
   const { settings, saveSettings } = useAppStore()
   const [local, setLocal] = useState({ ...settings })
   const [tab, setTab] = useState<'providers' | 'mcp' | 'skills' | 'memory' | 'general'>('providers')
@@ -14,21 +17,21 @@ export default function SettingsView() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-8">
-        <h2 className="text-lg font-bold text-text-primary mb-6">Settings</h2>
+        <h2 className="text-lg font-bold text-text-primary mb-6">{t('settings.title')}</h2>
 
         {/* Tab 切换 */}
         <div className="flex gap-1 mb-6 bg-bg-card rounded-lg p-1">
-          {(['providers', 'mcp', 'skills', 'memory', 'general'] as const).map(t => (
+          {(['providers', 'mcp', 'skills', 'memory', 'general'] as const).map(tabKey => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-2 text-xs font-medium rounded-md transition-colors capitalize ${
-                tab === t
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
+              className={`flex-1 py-2 text-xs font-medium rounded-md transition-colors ${
+                tab === tabKey
                   ? 'bg-accent text-white'
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
               }`}
             >
-              {t === 'providers' ? 'LLM Providers' : t === 'mcp' ? 'MCP Servers' : t === 'skills' ? 'Skills' : t === 'memory' ? 'Memory' : 'General'}
+              {t(`settings.tabs.${tabKey}`)}
             </button>
           ))}
         </div>
@@ -67,13 +70,15 @@ export default function SettingsView() {
         {tab === 'general' && (
           <GeneralSettings
             workspacePath={local.workspacePath}
-            onChange={(workspacePath) => setLocal({ ...local, workspacePath })}
+            language={(local.language as AppLanguage) || 'auto'}
+            onLanguageChange={(lang) => setLocal({ ...local, language: lang })}
+            onWorkspaceChange={(workspacePath) => setLocal({ ...local, workspacePath })}
           />
         )}
 
         {/* 保存按钮 */}
         <div className="mt-8 flex justify-end">
-          <button onClick={handleSave} className="btn-primary px-8">Save Settings</button>
+          <button onClick={handleSave} className="btn-primary px-8">{t('settings.save')}</button>
         </div>
       </div>
     </div>
@@ -88,6 +93,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
   activeId: string | null
   onChange: (providers: ProviderConfig[], activeId: string | null) => void
 }) {
+  const { t } = useTranslation()
   const addProvider = () => {
     const id = `prov-${Date.now()}`
     const newProv: ProviderConfig = {
@@ -121,19 +127,19 @@ function ProviderSettings({ providers, activeId, onChange }: {
   return (
     <div>
       <p className="text-xs text-text-muted mb-4">
-        Configure LLM providers. Any OpenAI-compatible endpoint works (Ollama, vLLM, OpenAI, Anthropic, etc.).
+        {t('settings.providers.hint')}
       </p>
 
       {/* 煮米 API 引流 */}
       <div className="flex items-center justify-between bg-bg-card border border-accent/30 rounded-lg px-4 py-3 mb-4">
         <div className="text-xs text-text-secondary">
-          <span className="text-accent-glow font-medium">煮米 API</span> — 一站式 AI 模型 API 服务，注册即送免费额度
+          <span className="text-accent-glow font-medium">煮米 API</span> — {t('settings.providers.zhuminetBanner')}
         </div>
         <button
           onClick={() => window.api.settings.openExternal('https://api.zhuminet.com/')}
           className="text-xs text-accent hover:text-accent-glow underline shrink-0"
         >
-          前往注册 →
+          {t('settings.providers.zhuminetRegister')}
         </button>
       </div>
 
@@ -146,11 +152,11 @@ function ProviderSettings({ providers, activeId, onChange }: {
             >
               {activeId === p.id ? '● ' : '○ '}{p.name}
             </button>
-            <button onClick={() => removeProvider(i)} className="text-xs text-err hover:underline">Remove</button>
+            <button onClick={() => removeProvider(i)} className="text-xs text-err hover:underline">{t('settings.providers.remove')}</button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-text-muted block mb-1">Name</label>
+              <label className="text-xs text-text-muted block mb-1">{t('settings.providers.name')}</label>
               <input
                 className="input-field w-full text-sm"
                 value={p.name}
@@ -158,7 +164,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
               />
             </div>
             <div>
-              <label className="text-xs text-text-muted block mb-1">Default Model</label>
+              <label className="text-xs text-text-muted block mb-1">{t('settings.providers.defaultModel')}</label>
               <input
                 className="input-field w-full text-sm"
                 value={p.defaultModel}
@@ -166,7 +172,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
               />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-text-muted block mb-1">Base URL</label>
+              <label className="text-xs text-text-muted block mb-1">{t('settings.providers.baseUrl')}</label>
               <input
                 className="input-field w-full text-sm"
                 value={p.baseUrl}
@@ -175,13 +181,13 @@ function ProviderSettings({ providers, activeId, onChange }: {
               />
             </div>
             <div>
-              <label className="text-xs text-text-muted block mb-1">API Key</label>
+              <label className="text-xs text-text-muted block mb-1">{t('settings.providers.apiKey')}</label>
               <input
                 className="input-field w-full text-sm"
                 type="password"
                 value={p.apiKey}
                 onChange={(e) => updateProvider(i, { apiKey: e.target.value })}
-                placeholder="(optional for local)"
+                placeholder={t('settings.providers.apiKeyPlaceholder')}
               />
             </div>
             <div className="flex items-end">
@@ -191,7 +197,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
                   checked={p.enabled}
                   onChange={(e) => updateProvider(i, { enabled: e.target.checked })}
                 />
-                <span className="text-text-secondary">Enabled</span>
+                <span className="text-text-secondary">{t('settings.providers.enabled')}</span>
               </label>
             </div>
           </div>
@@ -199,7 +205,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
           {/* Temperature */}
           <div className="mt-3">
             <label className="text-xs text-text-muted block mb-1">
-              Temperature {p.temperature !== undefined && `(${p.temperature})`}
+              {t('settings.providers.temperature')} {p.temperature !== undefined && `(${p.temperature})`}
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -215,10 +221,10 @@ function ProviderSettings({ providers, activeId, onChange }: {
                 onClick={() => updateProvider(i, { temperature: undefined })}
                 className="text-xs text-text-muted hover:text-text-primary"
               >
-                Reset
+                {t('settings.providers.temperatureReset')}
               </button>
             </div>
-            <p className="text-xs text-text-muted mt-1">Leave at 1.0 for default. Lower = focused, higher = creative.</p>
+            <p className="text-xs text-text-muted mt-1">{t('settings.providers.temperatureHint')}</p>
           </div>
 
           {/* Reasoning Effort */}
@@ -229,7 +235,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
                 checked={p.reasoningEnabled || false}
                 onChange={(e) => updateProvider(i, { reasoningEnabled: e.target.checked })}
               />
-              <span className="text-text-secondary">Reasoning Effort</span>
+              <span className="text-text-secondary">{t('settings.providers.reasoningEffort')}</span>
             </label>
             {p.reasoningEnabled && (
               <div className="flex-1">
@@ -238,9 +244,9 @@ function ProviderSettings({ providers, activeId, onChange }: {
                   value={p.reasoningEffort || 'medium'}
                   onChange={(e) => updateProvider(i, { reasoningEffort: e.target.value as 'low' | 'medium' | 'high' })}
                 >
-                  <option value="low">low — fast, less thinking</option>
-                  <option value="medium">medium — balanced</option>
-                  <option value="high">high — deep reasoning</option>
+                  <option value="low">{t('settings.providers.reasoningLow')}</option>
+                  <option value="medium">{t('settings.providers.reasoningMedium')}</option>
+                  <option value="high">{t('settings.providers.reasoningHigh')}</option>
                 </select>
               </div>
             )}
@@ -248,7 +254,7 @@ function ProviderSettings({ providers, activeId, onChange }: {
         </div>
       ))}
 
-      <button onClick={addProvider} className="btn-ghost w-full mt-2">+ Add Provider</button>
+      <button onClick={addProvider} className="btn-ghost w-full mt-2">{t('settings.providers.addProvider')}</button>
     </div>
   )
 }
@@ -260,6 +266,7 @@ function McpSettings({ servers, onChange }: {
   servers: McpServerConfig[]
   onChange: (servers: McpServerConfig[]) => void
 }) {
+  const { t } = useTranslation()
   const addServer = () => {
     const id = `mcp-${Date.now()}`
     const newServer: McpServerConfig = {
@@ -286,18 +293,18 @@ function McpSettings({ servers, onChange }: {
   return (
     <div>
       <p className="text-xs text-text-muted mb-4">
-        Configure MCP (Model Context Protocol) servers for extended tool capabilities.
+        {t('settings.mcp.hint')}
       </p>
 
       {servers.map((s, i) => (
         <div key={s.id} className="bg-bg-card border border-border rounded-lg p-4 mb-3">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-text-primary">{s.name}</span>
-            <button onClick={() => removeServer(i)} className="text-xs text-err hover:underline">Remove</button>
+            <button onClick={() => removeServer(i)} className="text-xs text-err hover:underline">{t('settings.mcp.remove')}</button>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-text-muted block mb-1">Name</label>
+              <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.name')}</label>
               <input
                 className="input-field w-full text-sm"
                 value={s.name}
@@ -305,7 +312,7 @@ function McpSettings({ servers, onChange }: {
               />
             </div>
             <div>
-              <label className="text-xs text-text-muted block mb-1">Type</label>
+              <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.type')}</label>
               <select
                 className="input-field w-full text-sm"
                 value={s.type}
@@ -318,17 +325,17 @@ function McpSettings({ servers, onChange }: {
             {s.type === 'stdio' ? (
               <>
                 <div className="col-span-2">
-                  <label className="text-xs text-text-muted block mb-1">Command</label>
+                  <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.command')}</label>
                   <input
                     className="input-field w-full text-sm font-mono"
                     value={s.command || ''}
                     onChange={(e) => updateServer(i, { command: e.target.value })}
                     placeholder="npx"
                   />
-                  <p className="text-xs text-text-muted mt-1">Executable only. Put flags/paths in Args below.</p>
+                  <p className="text-xs text-text-muted mt-1">{t('settings.mcp.commandHint')}</p>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs text-text-muted block mb-1">Args (space-separated)</label>
+                  <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.args')}</label>
                   <input
                     className="input-field w-full text-sm font-mono"
                     value={(s.args || []).join(' ')}
@@ -337,7 +344,7 @@ function McpSettings({ servers, onChange }: {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-xs text-text-muted block mb-1">Env (KEY=VALUE, one per line)</label>
+                  <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.env')}</label>
                   <textarea
                     className="input-field w-full text-sm font-mono"
                     rows={2}
@@ -356,7 +363,7 @@ function McpSettings({ servers, onChange }: {
               </>
             ) : (
               <div className="col-span-2">
-                <label className="text-xs text-text-muted block mb-1">URL</label>
+                <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.url')}</label>
                 <input
                   className="input-field w-full text-sm font-mono"
                   value={s.url || ''}
@@ -369,7 +376,7 @@ function McpSettings({ servers, onChange }: {
         </div>
       ))}
 
-      <button onClick={addServer} className="btn-ghost w-full mt-2">+ Add MCP Server</button>
+      <button onClick={addServer} className="btn-ghost w-full mt-2">{t('settings.mcp.addServer')}</button>
     </div>
   )
 }
@@ -381,6 +388,7 @@ function SkillSettings({ skills, onChange }: {
   skills: SkillConfig[]
   onChange: (skills: SkillConfig[]) => void
 }) {
+  const { t } = useTranslation()
   const addSkill = async () => {
     const filePath = await window.api.settings.pickFile()
     if (!filePath) return
@@ -408,7 +416,7 @@ function SkillSettings({ skills, onChange }: {
   return (
     <div>
       <p className="text-xs text-text-muted mb-4">
-        Load Skill definitions (SKILL.md files) to inject specialized prompts into the agent.
+        {t('settings.skills.hint')}
       </p>
 
       {skills.map((s, i) => (
@@ -420,14 +428,14 @@ function SkillSettings({ skills, onChange }: {
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1 text-xs cursor-pointer">
               <input type="checkbox" checked={s.enabled} onChange={() => toggleSkill(i)} />
-              <span className="text-text-secondary">{s.enabled ? 'On' : 'Off'}</span>
+              <span className="text-text-secondary">{s.enabled ? t('settings.skills.on') : t('settings.skills.off')}</span>
             </label>
-            <button onClick={() => removeSkill(i)} className="text-xs text-err hover:underline">Remove</button>
+            <button onClick={() => removeSkill(i)} className="text-xs text-err hover:underline">{t('settings.skills.remove')}</button>
           </div>
         </div>
       ))}
 
-      <button onClick={addSkill} className="btn-ghost w-full mt-2">+ Add Skill (pick .md file)</button>
+      <button onClick={addSkill} className="btn-ghost w-full mt-2">{t('settings.skills.addSkill')}</button>
     </div>
   )
 }
@@ -435,29 +443,58 @@ function SkillSettings({ skills, onChange }: {
 // ============================================================
 // General Settings
 // ============================================================
-function GeneralSettings({ workspacePath, onChange }: {
+function GeneralSettings({ workspacePath, language, onWorkspaceChange, onLanguageChange }: {
   workspacePath: string
-  onChange: (path: string) => void
+  language: AppLanguage
+  onWorkspaceChange: (path: string) => void
+  onLanguageChange: (lang: AppLanguage) => void
 }) {
+  const { t, i18n } = useTranslation()
   const pickDir = async () => {
     const dir = await window.api.settings.pickDirectory()
-    if (dir) onChange(dir)
+    if (dir) onWorkspaceChange(dir)
+  }
+
+  const handleLanguageChange = (lang: AppLanguage) => {
+    onLanguageChange(lang)
+    const effective = getEffectiveLanguage(lang)
+    storeLanguage(lang)
+    i18n.changeLanguage(effective)
   }
 
   return (
     <div>
-      <label className="text-xs text-text-muted block mb-1">Workspace Path</label>
+      <label className="text-xs text-text-muted block mb-1">{t('settings.general.workspacePath')}</label>
       <div className="flex gap-2">
         <input
           className="input-field flex-1 text-sm font-mono"
           value={workspacePath}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onWorkspaceChange(e.target.value)}
         />
-        <button onClick={pickDir} className="btn-ghost">Browse</button>
+        <button onClick={pickDir} className="btn-ghost">{t('settings.general.browse')}</button>
       </div>
       <p className="text-xs text-text-muted mt-2">
-        The root directory the agent will work in. File tools are relative to this path.
+        {t('settings.general.workspaceHint')}
       </p>
+
+      {/* 语言切换 */}
+      <div className="mt-6">
+        <label className="text-xs text-text-muted block mb-1">{t('settings.general.language')}</label>
+        <select
+          className="input-field w-full text-sm"
+          value={language}
+          onChange={(e) => handleLanguageChange(e.target.value as AppLanguage)}
+        >
+          {SUPPORTED_LANGUAGES.map(lang => (
+            <option key={lang.code} value={lang.code}>
+              {lang.code === 'auto' ? t('settings.general.autoDetect') : `${lang.nativeLabel}`}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-text-muted mt-2">
+          {t('settings.general.languageHint')}
+        </p>
+      </div>
     </div>
   )
 }
@@ -466,6 +503,7 @@ function GeneralSettings({ workspacePath, onChange }: {
 // Memory Settings — longterm-skill
 // ============================================================
 function MemorySettings() {
+  const { t } = useTranslation()
   const [memories, setMemories] = useState<MemoryEntry[]>([])
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('')
@@ -498,14 +536,6 @@ function MemorySettings() {
     loadMemories()
   }
 
-  const categoryLabels: Record<string, string> = {
-    preference: 'Preference',
-    habit: 'Habit',
-    fact: 'Fact',
-    skill: 'Skill',
-    context: 'Context'
-  }
-
   const categoryColors: Record<string, string> = {
     preference: 'text-blue-400',
     habit: 'text-green-400',
@@ -514,15 +544,19 @@ function MemorySettings() {
     context: 'text-cyan-400'
   }
 
+  const getCategoryLabel = (cat: string): string => {
+    return t(`settings.memory.${cat}`)
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-text-muted">
-          Long-term memory entries automatically captured from conversations. The agent uses these to personalize responses.
+          {t('settings.memory.hint')}
         </p>
         {memories.length > 0 && (
           <button onClick={handleClearAll} className="text-xs text-err hover:underline shrink-0 ml-4">
-            Clear All
+            {t('settings.memory.clearAll')}
           </button>
         )}
       </div>
@@ -531,7 +565,7 @@ function MemorySettings() {
       <div className="flex gap-2 mb-4">
         <input
           className="input-field flex-1 text-sm"
-          placeholder="Search memories..."
+          placeholder={t('settings.memory.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -540,19 +574,19 @@ function MemorySettings() {
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
         >
-          <option value="">All Categories</option>
-          <option value="preference">Preference</option>
-          <option value="habit">Habit</option>
-          <option value="fact">Fact</option>
-          <option value="skill">Skill</option>
-          <option value="context">Context</option>
+          <option value="">{t('settings.memory.allCategories')}</option>
+          <option value="preference">{t('settings.memory.preference')}</option>
+          <option value="habit">{t('settings.memory.habit')}</option>
+          <option value="fact">{t('settings.memory.fact')}</option>
+          <option value="skill">{t('settings.memory.skill')}</option>
+          <option value="context">{t('settings.memory.context')}</option>
         </select>
       </div>
 
       {/* 记忆列表 */}
       {memories.length === 0 ? (
         <div className="text-center py-12 text-text-muted text-sm">
-          {search || filterCategory ? 'No memories match your filter.' : 'No memories yet. They will be automatically captured as you chat with the agent.'}
+          {search || filterCategory ? t('settings.memory.noMatch') : t('settings.memory.noMemories')}
         </div>
       ) : (
         memories.map((mem) => (
@@ -561,7 +595,7 @@ function MemorySettings() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`text-xs font-medium ${categoryColors[mem.category] || 'text-text-secondary'}`}>
-                    {categoryLabels[mem.category] || mem.category}
+                    {getCategoryLabel(mem.category)}
                   </span>
                   {/* Importance 星级 */}
                   <div className="flex gap-0.5">
@@ -586,14 +620,14 @@ function MemorySettings() {
                   </div>
                 )}
                 <p className="text-xs text-text-muted mt-1">
-                  Accessed {mem.accessCount}x | {new Date(mem.createdAt).toLocaleDateString()}
+                  {t('settings.memory.accessed')} {mem.accessCount}{t('settings.memory.times')} | {new Date(mem.createdAt).toLocaleDateString()}
                 </p>
               </div>
               <button
                 onClick={() => handleDelete(mem.id)}
                 className="text-xs text-err hover:underline shrink-0"
               >
-                Delete
+                {t('settings.memory.delete')}
               </button>
             </div>
           </div>
