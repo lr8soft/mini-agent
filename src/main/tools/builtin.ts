@@ -5,6 +5,7 @@ import { promises as fs, createReadStream } from 'node:fs'
 import * as path from 'node:path'
 import { exec } from 'node:child_process'
 import { createInterface } from 'node:readline'
+import { minimatch } from 'minimatch'
 import type { ToolHandler, ToolContext } from './registry'
 import { updateSessionTitle } from '../store/db'
 import { mainWindow } from '../index'
@@ -179,7 +180,8 @@ export const grepTool: ToolHandler = {
         properties: {
           pattern: { type: 'string', description: '正则表达式' },
           path: { type: 'string', description: '搜索目录，默认工作目录' },
-          include: { type: 'string', description: '文件名通配符，如 *.ts' }
+          include: { type: 'string', description: '文件名 glob 过滤，如 *.ts、*.{h,cpp}' },
+          exclude: { type: 'array', items: { type: 'string' }, description: '要跳过的目录名列表，如 ["node_modules", ".git", "Binaries"]' }
         },
         required: ['pattern']
       }
@@ -190,6 +192,7 @@ export const grepTool: ToolHandler = {
     const pattern = args.pattern as string
     const searchPath = args.path as string || ctx.workspacePath
     const include = args.include as string
+    const exclude = new Set((args.exclude as string[]) || [])
     const resolved = path.isAbsolute(searchPath) ? searchPath : path.join(ctx.workspacePath, searchPath)
 
     const regex = new RegExp(pattern)
@@ -204,12 +207,12 @@ export const grepTool: ToolHandler = {
 
       for (const entry of entries) {
         if (results.length >= maxResults) break
-        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+        if (entry.isDirectory() && exclude.size > 0 && exclude.has(entry.name)) continue
         const fullPath = path.join(dir, entry.name)
         if (entry.isDirectory()) {
           await searchDir(fullPath)
         } else if (entry.isFile()) {
-          if (include && !matchGlob(entry.name, include)) continue
+          if (include && !minimatch(entry.name, include)) continue
           try {
             const rl = createInterface({ input: createReadStream(fullPath, { encoding: 'utf-8' }), crlfDelay: Infinity })
             let lineNum = 0
@@ -239,12 +242,13 @@ export const globTool: ToolHandler = {
     type: 'function',
     function: {
       name: 'glob',
-      description: '按通配符模式查找文件。',
+      description: '按通配符模式查找文件。支持标准 glob 语法：** 递归子目录，* 匹配任意字符（不含/），? 匹配单个字符。',
       parameters: {
         type: 'object',
         properties: {
-          pattern: { type: 'string', description: 'glob 模式，如 **/*.ts' },
-          path: { type: 'string', description: '搜索根目录，默认工作目录' }
+          pattern: { type: 'string', description: 'glob 模式，如 **/*.ts、**/*Scene*.h、src/**/*.cpp' },
+          path: { type: 'string', description: '搜索根目录，默认工作目录' },
+          exclude: { type: 'array', items: { type: 'string' }, description: '要跳过的目录名列表，如 ["node_modules", ".git", "Binaries"]' }
         },
         required: ['pattern']
       }
@@ -254,12 +258,12 @@ export const globTool: ToolHandler = {
   async execute(args, ctx) {
     const pattern = args.pattern as string
     const searchPath = args.path as string || ctx.workspacePath
+    const exclude = new Set((args.exclude as string[]) || [])
     const resolved = path.isAbsolute(searchPath) ? searchPath : path.join(ctx.workspacePath, searchPath)
 
     try {
-      // 纯 JS 递归实现 glob，不依赖 Node 22+ 的 fs.glob
       const results: string[] = []
-      await walkDir(resolved, pattern, results, ctx.workspacePath)
+      await walkDir(resolved, pattern, results, ctx.workspacePath, exclude)
       return results.length ? results.slice(0, 500).join('\n') : 'No files found'
     } catch (err) {
       return `Error: ${(err as Error).message}`
@@ -278,7 +282,7 @@ export const lsTool: ToolHandler = {
         type: 'object',
         properties: {
           path: { type: 'string', description: '目录路径，默认工作目录' },
-          ignore: { type: 'array', items: { type: 'string' }, description: '忽略的模式' }
+          ignore: { type: 'array', items: { type: 'string' }, description: '要忽略的目录/文件名模式' }
         }
       }
     }
@@ -286,13 +290,13 @@ export const lsTool: ToolHandler = {
   permission: 'safe',
   async execute(args, ctx) {
     const target = args.path as string || ctx.workspacePath
-    const ignore = (args.ignore as string[]) || ['node_modules', '.git']
+    const ignore = new Set((args.ignore as string[]) || [])
     const resolved = path.isAbsolute(target) ? target : path.join(ctx.workspacePath, target)
 
     try {
       const entries = await fs.readdir(resolved, { withFileTypes: true })
       const lines = entries
-        .filter(e => !ignore.some(ig => e.name.includes(ig)))
+        .filter(e => !ignore.has(e.name))
         .map(e => `${e.isDirectory() ? 'd' : 'f'} ${e.name}${e.isDirectory() ? '/' : ''}`)
         .sort()
       return lines.join('\n') || '(empty)'
@@ -306,12 +310,8 @@ export const lsTool: ToolHandler = {
 // 辅助函数
 // ============================================================
 
-function matchGlob(name: string, pattern: string): boolean {
-  const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
-  return regex.test(name)
-}
-
-async function walkDir(dir: string, pattern: string, results: string[], workspacePath: string) {
+/** 递归遍历目录，用 minimatch 匹配完整相对路径 */
+async function walkDir(dir: string, pattern: string, results: string[], workspacePath: string, exclude: Set<string> = new Set()) {
   if (results.length >= 500) return
   let entries: import('node:fs').Dirent[]
   try { entries = await fs.readdir(dir, { withFileTypes: true }) }
@@ -319,12 +319,15 @@ async function walkDir(dir: string, pattern: string, results: string[], workspac
 
   for (const entry of entries) {
     if (results.length >= 500) break
-    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue
+    if (entry.isDirectory() && exclude.has(entry.name)) continue
     const fullPath = path.join(dir, entry.name)
     if (entry.isDirectory()) {
-      await walkDir(fullPath, pattern, results, workspacePath)
-    } else if (matchGlob(entry.name, pattern)) {
-      results.push(path.relative(workspacePath, fullPath))
+      await walkDir(fullPath, pattern, results, workspacePath, exclude)
+    } else if (entry.isFile()) {
+      const relative = path.relative(workspacePath, fullPath)
+      if (minimatch(relative, pattern, { matchBase: true })) {
+        results.push(relative)
+      }
     }
   }
 }
