@@ -1,0 +1,50 @@
+{
+  "name": "mini-agent",
+  "version": "0.1.0",
+  "description": "A desktop AI coding agent platform — like OpenCode/Codex, in Electron",
+  "main": "./out/main/index.js",
+  "author": "mini-agent",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "build:win": "electron-vite build && electron-builder --win --x64"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^11.8.1",
+    "gray-matter": "^4.0.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "electron": "^32.1.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.49",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-syntax-highlighter": "^15.6.1",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.0",
+    "zustand": "^4.5.5"
+  },
+  "build": {
+    "appId": "com.miniagent.app",
+    "productName": "MiniAgent",
+    "directories": { "output": "release" },
+    "files": ["out/**/*"],
+    "win": { "target": ["nsis"], "icon": "build/icon.ico" }
+  }
+}

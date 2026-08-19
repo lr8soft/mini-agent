@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body, #root {
+    @apply h-full w-full overflow-hidden;
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    @apply bg-bg-base text-text-primary font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* 滚动条 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a3a;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a4a;
+  }
+
+  /* 输入框 */
+  .input-field {
+    @apply bg-bg-card border border-border rounded-lg px-3 py-2 text-text-primary
+           focus:outline-none focus:border-accent transition-colors;
+  }
+
+  /* 按钮 */
+  .btn {
+    @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-hover;
+  }
+  .btn-ghost {
+    @apply btn text-text-secondary hover:bg-bg-hover hover:text-text-primary;
+  }
+  .btn-danger {
+    @apply btn bg-err/20 text-err hover:bg-err/30;
+  }
+}
+
+/* Markdown 渲染样式 */
+.markdown-body {
+  @apply text-sm leading-relaxed;
+}
+.markdown-body p { @apply mb-3; }
+.markdown-body p:last-child { @apply mb-0; }
+.markdown-body h1 { @apply text-lg font-bold mb-3 mt-4; }
+.markdown-body h2 { @apply text-base font-bold mb-2 mt-3; }
+.markdown-body h3 { @apply text-sm font-bold mb-2 mt-2; }
+.markdown-body ul { @apply list-disc ml-5 mb-3; }
+.markdown-body ol { @apply list-decimal ml-5 mb-3; }
+.markdown-body li { @apply mb-1; }
+.markdown-body code {
+  @apply bg-bg-card px-1.5 py-0.5 rounded text-xs font-mono text-accent-glow;
+}
+.markdown-body pre {
+  @apply bg-bg-card rounded-lg p-3 mb-3 overflow-x-auto border border-border;
+}
+.markdown-body pre code {
+  @apply bg-transparent p-0 text-xs text-text-primary;
+}
+.markdown-body a { @apply text-accent-glow underline; }
+.markdown-body blockquote {
+  @apply border-l-2 border-border pl-3 text-text-secondary italic mb-3;
+}
+.markdown-body table {
+  @apply w-full text-xs mb-3 border-collapse;
+}
+.markdown-body th, .markdown-body td {
+  @apply border border-border px-2 py-1 text-left;
+}
