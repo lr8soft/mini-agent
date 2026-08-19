@@ -51,7 +51,7 @@ const api = {
       ipcRenderer.on('agent:tool_call', handler)
       return () => ipcRenderer.removeListener('agent:tool_call', handler)
     },
-    onToolResult: (cb: (data: { sessionId: string; toolCallId: string; result: string; isError: boolean; durationMs: number }) => void) => {
+    onToolResult: (cb: (data: { sessionId: string; toolCallId: string; toolName: string; result: string; isError: boolean; durationMs: number }) => void) => {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('agent:tool_result', handler)
       return () => ipcRenderer.removeListener('agent:tool_result', handler)

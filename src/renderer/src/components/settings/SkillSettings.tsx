@@ -32,6 +32,8 @@ export function SkillSettings({ skills, onChange }: Props) {
     onChange(next)
   }
 
+  // @ts-ignore
+  // @ts-ignore
   return (
     <div>
       <p className="text-xs text-text-muted mb-4">

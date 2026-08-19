@@ -3,6 +3,7 @@
 // 支持 stdio + SSE 两种传输方式
 // ============================================================
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
@@ -158,9 +159,10 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
         permission: 'normal',
         async execute(args: Record<string, unknown>, ctx: ToolContext) {
           try {
-            const result = await client.callTool({ name: tool.name, arguments: args })
+            // SDK 1.30 的 callTool 返回类型是联合（常规结果 | task 结果），这里按常规结果处理
+            const result = (await client.callTool({ name: tool.name, arguments: args })) as CallToolResult
             const text = result.content
-              ?.map((c: any) => c.type === 'text' ? c.text : JSON.stringify(c))
+              ?.map(c => (c.type === 'text' ? c.text : JSON.stringify(c)))
               .join('\n') || '(no output)'
             return text
           } catch (err) {

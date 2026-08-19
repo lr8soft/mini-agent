@@ -50,13 +50,13 @@ export function UsageSettings() {
 
   // 按天聚合为 recharts 友好格式
   const chartData = useMemo(() => {
-    const byDate = new Map<string, Record<string, number>>()
+    const byDate = new Map<string, Record<string, number | string>>()
 
     for (const d of daily) {
       if (!byDate.has(d.date)) byDate.set(d.date, { date: d.date.slice(5) }) // MM-DD
       const entry = byDate.get(d.date)!
-      entry[`${d.model}_input`] = (entry[`${d.model}_input`] || 0) + d.inputTokens
-      entry[`${d.model}_output`] = (entry[`${d.model}_output`] || 0) + d.outputTokens
+      entry[`${d.model}_input`] = (Number(entry[`${d.model}_input`]) || 0) + d.inputTokens
+      entry[`${d.model}_output`] = (Number(entry[`${d.model}_output`]) || 0) + d.outputTokens
     }
 
     return Array.from(byDate.values())
@@ -117,7 +117,7 @@ export function UsageSettings() {
               <Tooltip
                 contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
                 labelStyle={{ color: '#ccc' }}
-                formatter={(value: number, name: string) => [formatNumber(value), name]}
+                formatter={(value, name) => [formatNumber(Number(value) || 0), String(name ?? '')]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {allModelInputKeys.map((m, i) => (

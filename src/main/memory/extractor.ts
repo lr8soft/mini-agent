@@ -31,7 +31,9 @@ export async function extractMemories(
   // 过滤出有意义的对话内容（只取最近 20 条，避免过长）
   const dialogMessages = messages
     .filter(m => m.role === 'user' || m.role === 'assistant')
-    .filter(m => m.content && m.content.trim().length > 0)
+    .filter((m): m is ChatMessage & { content: string } =>
+      typeof m.content === 'string' && m.content.trim().length > 0
+    )
     .slice(-20)
 
   if (dialogMessages.length < 2) return []

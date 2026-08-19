@@ -115,7 +115,8 @@ export const desktopMouseDragTool: ToolHandler = {
     const button = (args.button as 'left' | 'right' | 'middle') || 'left'
     try {
       // dragMouse(x, y, button?) — drags from current pos to (x,y) with button pressed
-      robot.dragMouse(x, y, button)
+      // robotjs 的 d.ts 缺少 button 参数（运行时实际支持），此处做类型断言
+      ;(robot.dragMouse as (x: number, y: number, button?: string) => void)(x, y, button)
       return `Dragged mouse to (${x}, ${y}) with ${button} button`
     } catch (err) {
       return `Error dragging mouse: ${(err as Error).message}`

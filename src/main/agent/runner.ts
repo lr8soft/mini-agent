@@ -145,7 +145,7 @@ export async function runAgent(
       cb.onToolCall?.(tc)
 
       const toolEntry = getTool(tc.function.name)
-      let resultText: string
+      let resultText = ''
       let isError = false
       let durationMs = 0
 
@@ -240,11 +240,13 @@ export async function runAgent(
   return allAssistantMessages
 }
 
-/** 从消息列表中获取最后一条 user 消息的 content */
+/** 从消息列表中获取最后一条 user 消息的 content（多模态时拼接 text 部分） */
 function getLastUserMessage(messages: ChatMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user' && messages[i].content) {
-      return messages[i].content!
+    const msg = messages[i]
+    if (msg.role === 'user' && msg.content) {
+      if (typeof msg.content === 'string') return msg.content
+      return msg.content.filter(p => p.type === 'text').map(p => p.text).join('\n')
     }
   }
   return ''
