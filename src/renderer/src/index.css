@@ -96,9 +96,9 @@ h1, h2, h3, p { margin: 0; }
   background: var(--app-color-primary); font-size: 0.8rem; font-weight: 650; cursor: pointer;
 }
 .new-session-button:hover { background: var(--app-color-primary-strong); }
-.session-nav { display: grid; gap: 2px; flex: 1; min-height: 0; align-content: start; overflow-y: auto; padding-right: 2px; }
+.session-nav { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; flex: 1; min-height: 0; align-content: start; overflow-x: hidden; overflow-y: auto; padding-right: 2px; }
 .session-nav button {
-  width: 100%; min-height: 40px; display: flex; align-items: center; gap: 9px;
+  min-height: 40px; display: flex; align-items: center; gap: 9px;
   padding: 7px 8px; color: var(--app-color-text-soft); border: 0; border-radius: 6px;
   background: transparent; cursor: pointer; text-align: left;
 }
@@ -201,7 +201,7 @@ h1, h2, h3, p { margin: 0; }
 
 /* 输入区 */
 .chat-input-area { flex: 0 0 auto; border-top: 1px solid var(--app-color-border); background: var(--app-chrome-bg); padding: 14px 18px 16px; }
-.chat-input-row { max-width: 860px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; }
+.chat-input-row { display: flex; align-items: flex-end; gap: 10px; }
 .chat-textarea {
   flex: 1; min-height: 42px; max-height: 200px; resize: none; padding: 10px 12px;
   color: var(--app-color-text); border: 1px solid var(--app-color-border); border-radius: 6px;
