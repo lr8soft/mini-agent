@@ -200,6 +200,25 @@ function buildSystemPrompt(workspacePath: string, skillsPrompt: string, memoryPr
 - You also have access to MCP tools and Skills for extended capabilities.
 - You have a headless Chromium browser (via Playwright) with tools: browser_navigate, browser_click, browser_type, browser_screenshot, browser_get_text, browser_get_html, browser_wait, browser_close.
 
+## Desktop Control
+You can control the user's physical desktop (mouse, keyboard, screen) with these tools:
+- desktop_screen_size: Get screen resolution before doing coordinate-based operations.
+- desktop_get_mouse_pos: Check where the mouse cursor currently is.
+- desktop_mouse_move: Move cursor to (x, y). Set smooth=true for visible movement.
+- desktop_mouse_click: Click left/right/middle, optionally at specific coordinates. Supports double-click.
+- desktop_mouse_drag: Drag from current position to (x, y) with a button held.
+- desktop_mouse_scroll: Scroll the mouse wheel (positive Y=down, negative Y=up).
+- desktop_key_tap: Press a key or key combination (e.g. key="c", modifier="control" for Ctrl+C).
+- desktop_type_text: Type a string at the cursor. Set cpm for natural typing speed.
+- desktop_screenshot: Capture the screen and return a base64 PNG image for visual analysis.
+- desktop_get_pixel_color: Read the hex color of a specific pixel.
+
+When to use desktop tools:
+- When the user asks you to operate a desktop application, click UI elements, or automate GUI tasks.
+- Always call desktop_screen_size first to learn the resolution, then use desktop_screenshot to see what's on screen.
+- After any mouse/keyboard action, call desktop_screenshot to verify the result visually.
+- Mouse coordinates are in pixels with (0,0) at top-left corner.
+
 ## Long-term Memory
 You have access to a persistent memory system. You can proactively use these tools:
 - memory_search: Search stored memories about the user's preferences, habits, facts, skills, and project context.
