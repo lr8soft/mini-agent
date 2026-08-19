@@ -136,7 +136,7 @@ export const browserScreenshotTool: ToolHandler = {
     type: 'function',
     function: {
       name: 'browser_screenshot',
-      description: '截取当前页面截图，保存为 PNG 文件到指定路径。返回文件路径。',
+      description: '截取当前页面截图并返回图片供视觉分析。截图会以图片形式发送给你，你可以直接看到并分析页面内容。',
       parameters: {
         type: 'object',
         properties: {
@@ -154,9 +154,15 @@ export const browserScreenshotTool: ToolHandler = {
     const filePath = (args.file_path as string) || path.join(ctx.workspacePath, `screenshot-${Date.now()}.png`)
     try {
       const page = await ensureBrowser()
-      await page.screenshot({ path: filePath, fullPage, type: 'png' })
+      // 同时保存到文件和获取 base64
+      const screenshotBuffer = await page.screenshot({ path: filePath, fullPage, type: 'png' })
       const size = fs.statSync(filePath).size
-      return `Screenshot saved: ${filePath} (${(size / 1024).toFixed(1)} KB, ${fullPage ? 'full page' : 'viewport'})`
+      // screenshotBuffer 是 Buffer，转为 base64
+      const base64 = Buffer.isBuffer(screenshotBuffer)
+        ? screenshotBuffer.toString('base64')
+        : Buffer.from(screenshotBuffer).toString('base64')
+      // 返回 __IMAGE_BASE64__ 前缀标记，runner 会将其转换为多模态 content part
+      return `__IMAGE_BASE64__:${base64}`
     } catch (err) {
       return `Error taking screenshot: ${(err as Error).message}`
     }

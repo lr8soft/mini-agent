@@ -5,10 +5,21 @@
 /** LLM 角色标记 */
 export type Role = 'system' | 'user' | 'assistant' | 'tool'
 
+/** OpenAI 多模态 content part */
+export interface ContentPartText {
+  type: 'text'
+  text: string
+}
+export interface ContentPartImageUrl {
+  type: 'image_url'
+  image_url: { url: string; detail?: 'auto' | 'low' | 'high' }
+}
+export type ContentPart = ContentPartText | ContentPartImageUrl
+
 /** 单条对话消息（OpenAI 格式扩展） */
 export interface ChatMessage {
   role: Role
-  content: string | null
+  content: string | null | ContentPart[]
   tool_calls?: ToolCall[]
   tool_call_id?: string          // role=tool 时关联的调用 ID
   name?: string                  // role=tool 时工具名

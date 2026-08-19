@@ -159,7 +159,20 @@ export function estimateTokens(messages: ChatMessage[]): number {
   for (const msg of messages) {
     totalChars += 16 // 元数据开销
     if (msg.content) {
-      totalChars += msg.content.length
+      if (Array.isArray(msg.content)) {
+        // 多模态 content parts（如截图）
+        for (const part of msg.content) {
+          if (part.type === 'text') totalChars += part.text.length
+          else if (part.type === 'image_url') {
+            // base64 图片：粗略估算为 token 数 ≈ base64 长度 / 4（非常粗略，实际取决于模型视觉编码）
+            const url = part.image_url?.url || ''
+            const b64Start = url.indexOf('base64,')
+            totalChars += b64Start >= 0 ? (url.length - b64Start - 7) / 6 : url.length
+          }
+        }
+      } else {
+        totalChars += msg.content.length
+      }
     }
     if (msg.tool_calls) {
       for (const tc of msg.tool_calls) {
@@ -218,7 +231,17 @@ export async function autoCompact(
   const summaryInput = toCompress.map(m => {
     let text = `[${m.role}]`
     if (m.name) text += ` (${m.name})`
-    if (m.content) text += `: ${m.content}`
+    if (m.content) {
+      if (Array.isArray(m.content)) {
+        // 多模态 content：提取文本部分，图片标记为 [image]
+        for (const part of m.content) {
+          if (part.type === 'text') text += `: ${part.text}`
+          else if (part.type === 'image_url') text += ': [screenshot image]'
+        }
+      } else {
+        text += `: ${m.content}`
+      }
+    }
     if (m.tool_calls && m.tool_calls.length > 0) {
       text += ` [Tool calls: ${m.tool_calls.map(tc => `${tc.function.name}(${tc.function.arguments.slice(0, 100)})`).join(', ')}]`
     }

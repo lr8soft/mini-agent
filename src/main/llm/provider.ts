@@ -36,7 +36,8 @@ export async function streamChat(
     messages: params.messages.map(m => {
       const msg: Record<string, unknown> = {
         role: m.role,
-        content: m.content ?? ''
+        // content 可能是 string、null 或多模态 ContentPart[]（截图工具结果）
+        content: Array.isArray(m.content) ? m.content : (m.content ?? '')
       }
       // 只包含有值的字段，避免 llama.cpp 等严格后端因 null 报错
       if (m.tool_calls && m.tool_calls.length > 0) msg.tool_calls = m.tool_calls
@@ -163,7 +164,7 @@ export async function complete(
       messages: messages.map(m => {
         const msg: Record<string, unknown> = {
           role: m.role,
-          content: m.content ?? ''
+          content: Array.isArray(m.content) ? m.content : (m.content ?? '')
         }
         if (m.tool_calls && m.tool_calls.length > 0) msg.tool_calls = m.tool_calls
         if (m.tool_call_id) msg.tool_call_id = m.tool_call_id

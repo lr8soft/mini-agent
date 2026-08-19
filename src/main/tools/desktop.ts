@@ -307,7 +307,8 @@ export const desktopScreenshotTool: ToolHandler = {
         return `Screenshot captured but image appears empty. Source: ${source.name}`
       }
 
-      return `Screenshot captured from "${source.name}" (${source.thumbnail.width}x${source.thumbnail.height}). Image data (base64 PNG):\n${base64}`
+      // 返回 __IMAGE_BASE64__ 前缀标记，runner 会将其转换为多模态 content part
+      return `__IMAGE_BASE64__:${base64}`
     } catch (err) {
       return `Error capturing screenshot: ${(err as Error).message}`
     }

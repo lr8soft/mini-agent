@@ -2,7 +2,7 @@
 // Agent 调度器 — ReAct 工具调用循环
 // 核心流程: 用户输入 → LLM → (tool_calls? → 执行工具 → 回传结果 → LLM)* → 最终回答
 // ============================================================
-import type { ChatMessage, ProviderConfig, ToolCall } from '../../shared/types'
+import type { ChatMessage, ContentPart, ProviderConfig, ToolCall } from '../../shared/types'
 import { streamChat, log } from '../llm/provider'
 import { getTool, getAllTools, getToolPermission, type ToolContext } from '../tools/registry'
 import { buildMemoryPrompt, captureMemories } from '../memory/manager'
@@ -186,15 +186,34 @@ export async function runAgent(
         }
       }
 
-      cb.onToolResult?.(tc.id, resultText, isError, durationMs)
+      // 对于截图结果，传给前端/DB 的是精简文本，避免 base64 爆炸
+      const isImageResult = !isError && resultText.startsWith('__IMAGE_BASE64__:')
+      const displayResult = isImageResult
+        ? 'Screenshot captured (image sent to LLM for visual analysis)'
+        : resultText
+      cb.onToolResult?.(tc.id, displayResult, isError, durationMs)
 
-      // 追加 tool 消息
-      workingMessages.push({
-        role: 'tool',
-        tool_call_id: tc.id,
-        name: tc.function.name,
-        content: resultText
-      })
+      // 追加 tool 消息 — 如果结果是 base64 图片，组装为 OpenAI 多模态格式
+      if (isImageResult) {
+        const base64 = resultText.slice('__IMAGE_BASE64__:'.length)
+        const imageContent: ContentPart[] = [
+          { type: 'text', text: 'Screenshot captured.' },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${base64}`, detail: 'auto' } }
+        ]
+        workingMessages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          name: tc.function.name,
+          content: imageContent
+        })
+      } else {
+        workingMessages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          name: tc.function.name,
+          content: resultText
+        })
+      }
     }
 
     // 继续下一轮，让 LLM 看到工具结果后决定下一步
@@ -231,7 +250,7 @@ You can control the user's physical desktop (mouse, keyboard, screen) with these
 - desktop_mouse_scroll: Scroll the mouse wheel (positive Y=down, negative Y=up).
 - desktop_key_tap: Press a key or key combination (e.g. key="c", modifier="control" for Ctrl+C).
 - desktop_type_text: Type a string at the cursor. Set cpm for natural typing speed.
-- desktop_screenshot: Capture the screen and return a base64 PNG image for visual analysis.
+- desktop_screenshot: Capture the screen and return an image for visual analysis. The screenshot will be sent to you as an image — you can see and analyze it directly.
 - desktop_get_pixel_color: Read the hex color of a specific pixel.
 
 When to use desktop tools:
