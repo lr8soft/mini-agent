@@ -38,7 +38,8 @@ export default function App() {
           if (s.activeSessionId !== sessionId) return s
           const msgs = [...s.messages]
           const last = msgs[msgs.length - 1]
-          if (last && last.role === 'assistant') {
+          // append 到最后一条 assistant 消息（但不是 tool_call 消息）
+          if (last && last.role === 'assistant' && !last.toolCalls?.length) {
             msgs[msgs.length - 1] = { ...last, content: last.content + token }
           } else {
             msgs.push({
@@ -72,7 +73,7 @@ export default function App() {
       }),
 
       // 工具结果
-      window.api.agent.onToolResult(({ toolCallId, result, isError }) => {
+      window.api.agent.onToolResult(({ toolCallId, toolName, result, isError }) => {
         useAppStore.setState((s) => {
           const msgs = [...s.messages]
           msgs.push({
@@ -80,7 +81,7 @@ export default function App() {
             sessionId: s.activeSessionId || '',
             role: 'tool',
             content: result,
-            toolCallId,
+            toolCallId: toolName || toolCallId,
             timestamp: Date.now(),
             status: isError ? 'error' : 'done'
           })

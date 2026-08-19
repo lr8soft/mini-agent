@@ -112,32 +112,24 @@ export function setupIpc(win: BrowserWindow): void {
       name: m.toolName
     }))
 
-    // 创建空白 assistant 消息（用于流式更新）
-    const assistantMsgId = genId()
-    const assistantMsg = {
-      id: assistantMsgId,
-      sessionId,
-      role: 'assistant' as const,
-      content: '',
-      timestamp: Date.now(),
-      status: 'streaming' as const
-    }
-    db.addMessage(assistantMsg)
+    // 流式 assistant 消息 ID — 在 onAssistantMessage 或 onComplete 时存 DB
+    let streamingMsgId: string | null = null
+    let streamingContent = ''
 
     const abortController = new AbortController()
     abortControllers.set(sessionId, abortController)
 
     const callbacks: AgentEventCallbacks = {
       onToken: (token) => {
-        // 延迟数据库写入，只在内存里更新，最终写一次
-        assistantMsg.content += token
-        e.sender.send('agent:token', { sessionId, messageId: assistantMsgId, token })
+        // 纯流式推送前端，不存 DB
+        streamingContent += token
+        e.sender.send('agent:token', { sessionId, messageId: streamingMsgId || '', token })
       },
       onToolCall: (toolCall) => {
-        // 通知前端显示工具调用
+        // 通知前端显示工具调用（不单独存 DB，onAssistantMessage 已含 toolCalls）
         e.sender.send('agent:tool_call', { sessionId, toolCall })
       },
-      onToolResult: (toolCallId, result, isError, durationMs) => {
+      onToolResult: (toolCallId, toolName, result, isError, durationMs) => {
         // 保存工具结果消息到 DB
         const toolMsg = {
           id: genId(),
@@ -145,27 +137,58 @@ export function setupIpc(win: BrowserWindow): void {
           role: 'tool' as const,
           content: result,
           toolCallId,
-          toolName: toolCallId, // 简化处理
+          toolName,
           timestamp: Date.now(),
           status: isError ? 'error' : 'done' as const
         }
         db.addMessage(toolMsg)
-        e.sender.send('agent:tool_result', { sessionId, toolCallId, result, isError, durationMs })
+        e.sender.send('agent:tool_result', { sessionId, toolCallId, toolName, result, isError, durationMs })
       },
       onAssistantMessage: (content, toolCalls) => {
-        // 如果有 toolCalls，更新 assistant 消息以反映
-        if (toolCalls.length > 0) {
-          assistantMsg.toolCalls = toolCalls
+        // 每轮 LLM 输出完毕后存 DB（含文本内容 + toolCalls）
+        const msgId = genId()
+        const msg = {
+          id: msgId,
+          sessionId,
+          role: 'assistant' as const,
+          content: content || '',
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          timestamp: Date.now(),
+          status: 'done' as const
         }
+        db.addMessage(msg)
+        streamingMsgId = msgId
+        streamingContent = content || ''
       },
       onComplete: () => {
-        // 最终写入数据库
-        db.updateMessageContent(assistantMsgId, assistantMsg.content, 'done')
-        e.sender.send('agent:complete', { sessionId, messageId: assistantMsgId, content: assistantMsg.content })
+        // 最终 assistant 文本已在 onAssistantMessage 存入 DB
+        // 如果最后一轮没有 toolCalls（纯文本回复），onAssistantMessage 已存
+        // 如果 onAssistantMessage 没被调用（空回复），补存一条
+        if (!streamingMsgId) {
+          const msgId = genId()
+          db.addMessage({
+            id: msgId,
+            sessionId,
+            role: 'assistant',
+            content: streamingContent || '',
+            timestamp: Date.now(),
+            status: 'done'
+          })
+        }
+        e.sender.send('agent:complete', { sessionId, messageId: streamingMsgId || '', content: streamingContent })
         abortControllers.delete(sessionId)
       },
       onError: (error) => {
-        db.updateMessageContent(assistantMsgId, assistantMsg.content || `Error: ${error.message}`, 'error')
+        if (!streamingMsgId) {
+          db.addMessage({
+            id: genId(),
+            sessionId,
+            role: 'assistant',
+            content: streamingContent || `Error: ${error.message}`,
+            timestamp: Date.now(),
+            status: 'error'
+          })
+        }
         e.sender.send('agent:error', { sessionId, error: error.message })
         abortControllers.delete(sessionId)
       }

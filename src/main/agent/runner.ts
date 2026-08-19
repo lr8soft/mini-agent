@@ -23,7 +23,7 @@ export interface AgentEventCallbacks {
   /** LLM 请求了工具调用 */
   onToolCall?: (toolCall: ToolCall) => void
   /** 工具执行完成 */
-  onToolResult?: (toolCallId: string, result: string, isError: boolean, durationMs: number) => void
+  onToolResult?: (toolCallId: string, toolName: string, result: string, isError: boolean, durationMs: number) => void
   /** 一轮 LLM 调用完成（可能继续循环或结束） */
   onAssistantMessage?: (content: string, toolCalls: ToolCall[]) => void
   /** 整个对话完成 */
@@ -159,7 +159,7 @@ export async function runAgent(
             if (!allowed) {
               resultText = 'Permission denied by user'
               isError = true
-              cb.onToolResult?.(tc.id, resultText, true, 0)
+              cb.onToolResult?.(tc.id, tc.function.name, resultText, true, 0)
               workingMessages.push({
                 role: 'tool',
                 tool_call_id: tc.id,
@@ -192,7 +192,7 @@ export async function runAgent(
       const displayResult = isImageResult
         ? 'Screenshot captured (image sent to LLM for visual analysis)'
         : resultText
-      cb.onToolResult?.(tc.id, displayResult, isError, durationMs)
+      cb.onToolResult?.(tc.id, tc.function.name, displayResult, isError, durationMs)
 
       // 追加 tool 消息 — 如果结果是 base64 图片，组装为 OpenAI 多模态格式
       if (isImageResult) {
