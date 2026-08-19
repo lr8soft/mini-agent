@@ -4,7 +4,7 @@
 import type { ChatMessage, ProviderConfig, MemoryEntry } from '../../shared/types'
 import { addMemory, getMemories, touchMemory, getMemories as queryMemories } from '../store/db'
 import { extractMemories } from './extractor'
-import { log } from '../llm/provider'
+import { log } from '../llm/logger'
 
 /**
  * 从对话中提取并存储记忆

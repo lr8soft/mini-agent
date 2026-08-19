@@ -5,7 +5,7 @@
 import { promises as fs } from 'node:fs'
 import matter from 'gray-matter'
 import type { SkillConfig } from '../../shared/types'
-import { log } from '../llm/provider'
+import { log } from '../llm/logger'
 
 interface LoadedSkill {
   config: SkillConfig

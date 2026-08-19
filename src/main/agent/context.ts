@@ -3,7 +3,8 @@
 // 当上下文使用超过阈值时自动压缩对话历史
 // ============================================================
 import type { ChatMessage, ProviderConfig } from '../../shared/types'
-import { complete, log } from '../llm/provider'
+import { complete } from '../llm/provider'
+import { log } from '../llm/logger'
 
 // 默认上下文窗口（API 未返回时的 fallback）
 const DEFAULT_CONTEXT_WINDOW = 32768

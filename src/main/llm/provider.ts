@@ -3,7 +3,7 @@
 // 天然支持任意端点：OpenAI / Anthropic(兼容层) / Ollama / vLLM
 // ============================================================
 import type { ChatMessage, ProviderConfig, ToolCall, ToolDefinition } from '../../shared/types'
-import { mainWindow } from '../index'
+import { log } from './logger'
 
 export interface TokenUsage {
   prompt_tokens: number
@@ -198,11 +198,4 @@ export async function complete(
   if (!resp.ok) throw new Error(`LLM API ${resp.status}: ${await resp.text()}`)
   const json: any = await resp.json()
   return json.choices?.[0]?.message?.content || ''
-}
-
-// 日志辅助
-export function log(level: 'info' | 'warn' | 'error', msg: string) {
-  const ts = new Date().toISOString().slice(11, 19)
-  console.log(`[${ts}] [${level.toUpperCase()}] ${msg}`)
-  mainWindow?.webContents.send('agent:log', { level, msg, ts })
 }

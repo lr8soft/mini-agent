@@ -8,7 +8,7 @@ import { createInterface } from 'node:readline'
 import { minimatch } from 'minimatch'
 import type { ToolHandler, ToolContext } from './registry'
 import { updateSessionTitle } from '../store/db'
-import { mainWindow } from '../index'
+import { log } from '../llm/logger'
 
 // 文本读取工具
 export const readTool: ToolHandler = {
@@ -355,7 +355,7 @@ export const setTitleTool: ToolHandler = {
     const sid = ctx.sessionId
     if (sid) {
       updateSessionTitle(sid, title)
-      mainWindow?.webContents.send('session:title_updated', { sessionId: sid, title })
+      ctx.onSessionTitleUpdate?.(sid, title)
       return `Session title set to: ${title}`
     }
     return `Title suggestion: ${title} (no active session context)`

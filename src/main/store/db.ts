@@ -13,6 +13,7 @@ export function initDatabase(): void {
   const dbPath = path.join(userDataPath, 'mini-agent.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -133,6 +134,9 @@ export function updateSessionWorkspace(id: string, workspacePath: string): void 
 }
 
 export function deleteSession(id: string): void {
+  // 外键级联开启后，删除 session 会自动删除关联的 messages 和 token_usage
+  // 但为兼容旧数据库（可能未启用 foreign_keys），手动删除关联数据
+  db!.prepare('DELETE FROM token_usage WHERE session_id = ?').run(id)
   db!.prepare('DELETE FROM messages WHERE session_id = ?').run(id)
   db!.prepare('DELETE FROM sessions WHERE id = ?').run(id)
 }

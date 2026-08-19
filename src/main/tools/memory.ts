@@ -5,7 +5,7 @@
 import type { ToolHandler, ToolContext } from './registry'
 import { getMemories, addMemory, deleteMemory, touchMemory } from '../store/db'
 import type { MemoryCategory } from '../../shared/types'
-import { log } from '../llm/provider'
+import { log } from '../llm/logger'
 
 // ---- 搜索记忆 ----
 export const memorySearchTool: ToolHandler = {

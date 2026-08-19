@@ -7,7 +7,7 @@ import * as path from 'node:path'
 import { initDatabase, getSettings } from './store/db'
 import { setupIpc } from './ipc'
 import { reconnectAllMcpServers } from './mcp/client'
-import { log } from './llm/provider'
+import { log, onLog } from './llm/logger'
 
 export let mainWindow: BrowserWindow | null = null
 
@@ -68,6 +68,11 @@ app.whenReady().then(async () => {
 
   // 设置 IPC
   setupIpc(win)
+
+  // 注册日志转发：主进程 → 渲染进程
+  onLog(({ level, msg, ts }) => {
+    mainWindow?.webContents.send('agent:log', { level, msg, ts })
+  })
 
   // 启动时自动连接已配置的 MCP 服务器
   const settings = getSettings()

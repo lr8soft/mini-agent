@@ -17,6 +17,8 @@ export interface ToolContext {
   onProgress?: (msg: string) => void
   /** 请求权限（如果用户配置了需要确认），返回是否允许 */
   requestPermission?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
+  /** 会话标题更新回调（由 IPC 层注入，转发到渲染进程） */
+  onSessionTitleUpdate?: (sessionId: string, title: string) => void
 }
 
 export interface ToolHandler {

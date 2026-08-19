@@ -6,7 +6,8 @@ import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import type { AppSettings, ChatMessage } from '../../shared/types'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter, type AgentEventCallbacks } from '../agent/runner'
-import { log, type TokenUsage } from '../llm/provider'
+import { type TokenUsage } from '../llm/provider'
+import { log } from '../llm/logger'
 import { registerTool, clearTools } from '../tools/registry'
 import { builtinTools } from '../tools/builtin'
 import { browserTools } from '../tools/browser'
@@ -247,14 +248,17 @@ export function setupIpc(win: BrowserWindow): void {
           permissionCheck,
           signal: abortController.signal,
           modelOverride: options?.modelOverride,
-          memoryEnabled: settings.memoryEnabled !== false
+          memoryEnabled: settings.memoryEnabled !== false,
+          onSessionTitleUpdate: (sid, title) => {
+            mainWindow?.webContents.send('session:title_updated', { sessionId: sid, title })
+          }
         },
         callbacks
       )
-      return { ok: true, assistantMessageId: assistantMsgId }
+      return { ok: true }
     } catch (err) {
       const msg = (err as Error).message
-      db.updateMessageContent(assistantMsgId, assistantMsg.content || `Error: ${msg}`, 'error')
+      // 错误已在 onError 回调中存入 DB，这里只返回错误信息
       return { error: msg }
     }
   })

@@ -8,7 +8,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { McpServerConfig, ToolDefinition } from '../../shared/types'
 import { registerTool, unregisterToolsBySource, type ToolHandler, type ToolContext } from '../tools/registry'
-import { log } from '../llm/provider'
+import { log } from '../llm/logger'
 
 interface ActiveConnection {
   client: Client

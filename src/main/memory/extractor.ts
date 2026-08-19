@@ -3,7 +3,8 @@
 // 在 Agent 对话完成后异步调用，不影响主流程
 // ============================================================
 import type { ChatMessage, ProviderConfig, MemoryCategory } from '../../shared/types'
-import { complete, log } from '../llm/provider'
+import { complete } from '../llm/provider'
+import { log } from '../llm/logger'
 
 /** LLM 提取的单条记忆 */
 interface ExtractedMemory {

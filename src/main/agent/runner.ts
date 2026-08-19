@@ -3,7 +3,8 @@
 // 核心流程: 用户输入 → LLM → (tool_calls? → 执行工具 → 回传结果 → LLM)* → 最终回答
 // ============================================================
 import type { ChatMessage, ContentPart, ProviderConfig, ToolCall } from '../../shared/types'
-import { streamChat, log, type TokenUsage } from '../llm/provider'
+import { streamChat, type TokenUsage } from '../llm/provider'
+import { log } from '../llm/logger'
 import { getTool, getAllTools, getToolPermission, getToolsBySource, type ToolContext } from '../tools/registry'
 import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
@@ -47,6 +48,8 @@ export interface AgentRunOptions {
   modelOverride?: string
   /** 是否启用长期记忆（提取 + 注入） */
   memoryEnabled?: boolean
+  /** 会话标题更新回调（由 IPC 层注入） */
+  onSessionTitleUpdate?: (sessionId: string, title: string) => void
 }
 
 /**
@@ -56,7 +59,7 @@ export async function runAgent(
   opts: AgentRunOptions,
   cb: AgentEventCallbacks
 ): Promise<ChatMessage[]> {
-  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, sessionId, memoryEnabled } = opts
+  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, sessionId, memoryEnabled, onSessionTitleUpdate } = opts
 
   // 构建系统提示词（含记忆注入 + MCP 工具动态列表）
   const skillsPrompt = skillsPromptGetter ? skillsPromptGetter() : ''
@@ -179,7 +182,7 @@ export async function runAgent(
           }
 
           // 执行工具
-          const ctx: ToolContext = { workspacePath, sessionId }
+          const ctx: ToolContext = { workspacePath, sessionId, onSessionTitleUpdate }
           const start = Date.now()
           try {
             log('info', `Executing tool: ${tc.function.name}(${JSON.stringify(parsedArgs).slice(0, 200)})`)

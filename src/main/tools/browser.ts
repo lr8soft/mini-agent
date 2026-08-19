@@ -8,7 +8,7 @@ import { app } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import type { ToolHandler, ToolContext } from './registry'
-import { log } from '../llm/provider'
+import { log } from '../llm/logger'
 
 // 全局浏览器实例（懒加载，首次调用时启动）
 let browser: Browser | null = null
