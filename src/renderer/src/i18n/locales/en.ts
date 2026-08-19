@@ -50,8 +50,8 @@ export default {
     save: 'Save Settings',
     providers: {
       hint: 'Configure LLM providers. Any OpenAI-compatible endpoint works (Ollama, vLLM, OpenAI, Anthropic, etc.).',
-      zhuminetBanner: '一站式 AI 模型 API 服务，注册即送免费额度',
-      zhuminetRegister: '前往注册 →',
+      zhuminetBanner: 'All-in-one AI model API service. Sign up to get free credits.',
+      zhuminetRegister: 'Sign up →',
       name: 'Name',
       defaultModel: 'Default Model',
       baseUrl: 'Base URL',
@@ -71,7 +71,7 @@ export default {
       activate: 'Click to activate',
       contextWindow: 'Context Window',
       contextWindowAuto: 'Auto',
-      contextWindowHint: 'Max tokens for the model (0 = auto-detect from preset table). Auto compact triggers at 60% usage.'
+      contextWindowHint: 'Max tokens for the model (0 = auto-detect from API). Auto compact triggers at 60% usage.'
     },
     mcp: {
       hint: 'Configure MCP (Model Context Protocol) servers for extended tool capabilities.',
