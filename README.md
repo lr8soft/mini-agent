@@ -13,6 +13,7 @@ A desktop AI coding agent platform built with Electron + React + TypeScript. Lik
 - **Permission System** — Safe tools auto-approved; dangerous tools require explicit user confirmation. Auto-approve toggle for power users.
 - **Model Switching** — Switch models on-the-fly from the chat bar without changing settings.
 - **Temperature & Reasoning Effort** — Per-provider temperature control and reasoning effort (low/medium/high) with toggle.
+- **Auto Compact** — Automatically compresses conversation history when context usage exceeds 60%. Context window is auto-detected from the provider's API (`/v1/models` meta for llama.cpp, `/api/show` for Ollama, or manual override). Early messages are summarized by the LLM, preserving key context while recent messages are kept intact. Prevents 400 errors from exceeding context window limits.
 - **Browser Automation** — Headless Chromium via Playwright: `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot`, `browser_get_text`, `browser_get_html`, `browser_wait`, `browser_close`.
 - **Long-term Memory** — Automatically extracts and stores user preferences, habits, and context from conversations via LLM. Injects relevant memories into system prompts for personalized responses.
 - **Dark Terminal Aesthetic** — OpenCode-inspired UI with monospace fonts and purple accent.
@@ -86,6 +87,7 @@ Open Settings (gear icon in sidebar) to configure:
 | Default Model | Model name (e.g. `qwen2.5:14b`) |
 | Temperature | 0–2, lower = focused, higher = creative |
 | Reasoning Effort | low/medium/high (toggle on/off) — for models like DeepSeek-R1, OpenAI o-series |
+| Context Window | Max tokens for the model (0 = auto-detect from preset table). Auto compact triggers at 60% usage. |
 
 ### MCP Servers
 
@@ -140,6 +142,11 @@ Automatically captures user preferences, habits, working style, and project cont
 │  │  (extractor + retrieval +        │   │
 │  │   prompt injection)               │   │
 │  └───────────────────────────────────┘   │
+│  ┌───────────────────────────────────┐   │
+│  │       Context Manager             │   │
+│  │  (token estimation + auto compact │   │
+│  │   at 60% threshold)               │   │
+│  └───────────────────────────────────┘   │
 │                 IPC Bridge               │
 ├─────────────────────────────────────────┤
 │              Preload (contextBridge)      │
@@ -174,6 +181,42 @@ User Input
 ```
 
 Max 20 rounds per conversation to prevent infinite loops.
+
+### Auto Compact Flow
+
+```
+Before sending to LLM
+        │
+        ▼
+┌──────────────────┐
+│ Estimate tokens  │
+│ (chars / 4)      │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ tokens > 60% of  │─── no ───► Send messages to LLM
+│ context window?  │
+└────────┬─────────┘
+         │ yes
+         ▼
+┌──────────────────┐
+│ Split messages:  │
+│ - Keep system    │
+│ - Keep last 8    │
+│ - Summarize rest │
+│   via LLM        │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│ Replace old msgs │
+│ with summary     │
+└────────┬─────────┘
+         │
+         ▼
+   Send to LLM
+```
 
 ### Memory Flow (Long-term)
 

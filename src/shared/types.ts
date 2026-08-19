@@ -32,6 +32,7 @@ export interface ProviderConfig {
   temperature?: number             // 采样温度，不设则由 API 默认
   reasoningEnabled?: boolean       // 是否启用思考强度
   reasoningEffort?: 'low' | 'medium' | 'high'  // 思考强度（reasoning_effort）
+  contextWindow?: number           // 模型上下文窗口大小（token 数），0 或未设 = 自动检测
 }
 
 /** 单条渲染消息（UI 专用，含元数据） */

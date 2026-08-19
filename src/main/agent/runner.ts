@@ -6,6 +6,7 @@ import type { ChatMessage, ProviderConfig, ToolCall } from '../../shared/types'
 import { streamChat, log } from '../llm/provider'
 import { getTool, getAllTools, getToolPermission, type ToolContext } from '../tools/registry'
 import { buildMemoryPrompt, captureMemories } from '../memory/manager'
+import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
 
 const MAX_TOOL_ROUNDS = 20      // 单次对话最大工具调用轮数，防止死循环
 
@@ -65,12 +66,32 @@ export async function runAgent(
     ...messages
   ]
 
+  // 运行时获取上下文窗口大小（从 API 动态检测）
+  const contextWindow = await fetchContextWindow(provider, modelOverride)
+  log('info', `Context window: ${contextWindow} tokens`)
+
+  // Auto Compact: 发送前检查上下文是否超阈值
+  if (needsCompact(workingMessages, contextWindow)) {
+    log('info', 'Auto compact triggered before sending')
+    const compacted = await autoCompact(workingMessages, provider, modelOverride)
+    workingMessages.length = 0
+    workingMessages.push(...compacted)
+  }
+
   let round = 0
   const allAssistantMessages: ChatMessage[] = []
 
   while (round < MAX_TOOL_ROUNDS) {
     round++
     log('info', `Agent round ${round} — sending ${workingMessages.length} messages to LLM`)
+
+    // 每轮发送前也检查（工具结果可能很大，导致上下文膨胀）
+    if (round > 1 && needsCompact(workingMessages, contextWindow)) {
+      log('info', `Auto compact triggered at round ${round}`)
+      const compacted = await autoCompact(workingMessages, provider, modelOverride)
+      workingMessages.length = 0
+      workingMessages.push(...compacted)
+    }
 
     const tools = getAllTools()
     const { content, toolCalls } = await streamChat(provider, {

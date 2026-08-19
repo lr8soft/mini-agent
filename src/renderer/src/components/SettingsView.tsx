@@ -105,7 +105,8 @@ function ProviderSettings({ providers, activeId, onChange }: {
       enabled: true,
       temperature: undefined,
       reasoningEnabled: false,
-      reasoningEffort: 'medium'
+      reasoningEffort: 'medium',
+      contextWindow: 0
     }
     onChange([...providers, newProv], activeId || id)
   }
@@ -250,6 +251,29 @@ function ProviderSettings({ providers, activeId, onChange }: {
                 </select>
               </div>
             )}
+          </div>
+
+          {/* Context Window */}
+          <div className="mt-3">
+            <label className="text-xs text-text-muted block mb-1">{t('settings.providers.contextWindow')}</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                className="input-field flex-1 text-sm"
+                value={p.contextWindow || 0}
+                min={0}
+                step={1024}
+                onChange={(e) => updateProvider(i, { contextWindow: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+              />
+              <button
+                onClick={() => updateProvider(i, { contextWindow: 0 })}
+                className="text-xs text-text-muted hover:text-text-primary shrink-0"
+              >
+                {t('settings.providers.contextWindowAuto')}
+              </button>
+            </div>
+            <p className="text-xs text-text-muted mt-1">{t('settings.providers.contextWindowHint')}</p>
           </div>
         </div>
       ))}

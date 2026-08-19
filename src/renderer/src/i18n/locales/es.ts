@@ -68,7 +68,10 @@ export default {
       addProvider: '+ Añadir Proveedor',
       remove: 'Eliminar',
       active: 'Activo',
-      activate: 'Click para activar'
+      activate: 'Click para activar',
+      contextWindow: 'Ventana de Contexto',
+      contextWindowAuto: 'Auto',
+      contextWindowHint: 'Máx. tokens del modelo (0 = autodetectar). Compresión automática al 60% de uso.'
     },
     mcp: {
       hint: 'Configura servidores MCP (Model Context Protocol) para capacidades extendidas.',

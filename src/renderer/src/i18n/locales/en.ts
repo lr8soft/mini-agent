@@ -68,7 +68,10 @@ export default {
       addProvider: '+ Add Provider',
       remove: 'Remove',
       active: 'Active',
-      activate: 'Click to activate'
+      activate: 'Click to activate',
+      contextWindow: 'Context Window',
+      contextWindowAuto: 'Auto',
+      contextWindowHint: 'Max tokens for the model (0 = auto-detect from preset table). Auto compact triggers at 60% usage.'
     },
     mcp: {
       hint: 'Configure MCP (Model Context Protocol) servers for extended tool capabilities.',

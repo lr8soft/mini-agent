@@ -68,7 +68,10 @@ export default {
       addProvider: '+ 添加提供商',
       remove: '移除',
       active: '当前使用',
-      activate: '点击切换为当前'
+      activate: '点击切换为当前',
+      contextWindow: '上下文窗口',
+      contextWindowAuto: '自动',
+      contextWindowHint: '模型最大 token 数（0 = 自动从预设表检测）。上下文使用超过 60% 时自动压缩。'
     },
     mcp: {
       hint: '配置 MCP (Model Context Protocol) 服务器以扩展工具能力。',

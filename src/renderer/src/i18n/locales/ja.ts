@@ -68,7 +68,10 @@ export default {
       addProvider: '+ プロバイダーを追加',
       remove: '削除',
       active: 'アクティブ',
-      activate: 'クリックしてアクティブ化'
+      activate: 'クリックしてアクティブ化',
+      contextWindow: 'コンテキストウィンドウ',
+      contextWindowAuto: '自動',
+      contextWindowHint: 'モデルの最大トークン数（0 = プリセットから自動検出）。使用率60%で自動圧縮。'
     },
     mcp: {
       hint: 'MCP (Model Context Protocol) サーバーを設定してツール機能を拡張。',
