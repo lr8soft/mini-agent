@@ -21,7 +21,9 @@ const api = {
     rename: (id: string, title: string): Promise<boolean> =>
       ipcRenderer.invoke('session:rename', id, title),
     messages: (id: string): Promise<UIMessage[]> =>
-      ipcRenderer.invoke('session:messages', id)
+      ipcRenderer.invoke('session:messages', id),
+    updateWorkspace: (id: string, workspacePath: string): Promise<boolean> =>
+      ipcRenderer.invoke('session:updateWorkspace', id, workspacePath)
   },
 
   // ============================================================
@@ -109,6 +111,16 @@ const api = {
       ipcRenderer.invoke('memory:clearAll'),
     updateImportance: (id: string, importance: number): Promise<boolean> =>
       ipcRenderer.invoke('memory:updateImportance', id, importance)
+  },
+
+  // ============================================================
+  // Token Usage
+  // ============================================================
+  token: {
+    summary: (): Promise<any[]> =>
+      ipcRenderer.invoke('token:summary'),
+    daily: (days?: number): Promise<any[]> =>
+      ipcRenderer.invoke('token:daily', days)
   },
 
   // ============================================================

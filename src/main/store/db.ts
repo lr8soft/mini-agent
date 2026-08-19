@@ -56,19 +56,38 @@ export function initDatabase(): void {
 
     CREATE INDEX IF NOT EXISTS idx_memory_category ON memory_entries(category);
     CREATE INDEX IF NOT EXISTS idx_memory_importance ON memory_entries(importance DESC);
+
+    CREATE TABLE IF NOT EXISTS token_usage (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_token_usage_session ON token_usage(session_id);
+    CREATE INDEX IF NOT EXISTS idx_token_usage_created ON token_usage(created_at);
   `)
+
+  // 迁移：给 sessions 加 workspace_path 列（如果不存在）
+  const columns = db!.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]
+  if (!columns.some(c => c.name === 'workspace_path')) {
+    db!.exec('ALTER TABLE sessions ADD COLUMN workspace_path TEXT')
+  }
 }
 
 // ============================================================
 // Session 操作
 // ============================================================
 
-export function createSession(title = 'New Session'): Session {
+export function createSession(title = 'New Session', workspacePath?: string): Session {
   const id = genId()
   const now = Date.now()
-  db!.prepare('INSERT INTO sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)')
-    .run(id, title, now, now)
-  return { id, title, createdAt: now, updatedAt: now, messageCount: 0 }
+  db!.prepare('INSERT INTO sessions (id, title, created_at, updated_at, workspace_path) VALUES (?, ?, ?, ?, ?)')
+    .run(id, title, now, now, workspacePath || null)
+  return { id, title, createdAt: now, updatedAt: now, messageCount: 0, workspacePath }
 }
 
 export function getSessions(): Session[] {
@@ -84,7 +103,8 @@ export function getSessions(): Session[] {
     title: r.title,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-    messageCount: r.msg_count
+    messageCount: r.msg_count,
+    workspacePath: r.workspace_path || undefined
   }))
 }
 
@@ -97,13 +117,19 @@ export function getSession(id: string): Session | null {
     title: row.title,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    messageCount: msgCount
+    messageCount: msgCount,
+    workspacePath: row.workspace_path || undefined
   }
 }
 
 export function updateSessionTitle(id: string, title: string): void {
   db!.prepare('UPDATE sessions SET title = ?, updated_at = ? WHERE id = ?')
     .run(title, Date.now(), id)
+}
+
+export function updateSessionWorkspace(id: string, workspacePath: string): void {
+  db!.prepare('UPDATE sessions SET workspace_path = ? WHERE id = ?')
+    .run(workspacePath, id)
 }
 
 export function deleteSession(id: string): void {
@@ -262,4 +288,72 @@ export function touchMemory(id: string): void {
 
 export function updateMemoryImportance(id: string, importance: number): void {
   db!.prepare('UPDATE memory_entries SET importance = ? WHERE id = ?').run(importance, id)
+}
+
+// ============================================================
+// Token Usage 操作
+// ============================================================
+
+export interface TokenUsageRecord {
+  id: string
+  sessionId: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  createdAt: number
+}
+
+export function addTokenUsage(record: Omit<TokenUsageRecord, 'id'>): void {
+  const id = genId()
+  db!.prepare('INSERT INTO token_usage (id, session_id, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, record.sessionId, record.model, record.inputTokens, record.outputTokens, record.createdAt)
+}
+
+export interface TokenUsageSummary {
+  model: string
+  totalInput: number
+  totalOutput: number
+  count: number
+}
+
+export function getTokenUsageSummary(): TokenUsageSummary[] {
+  const rows = db!.prepare(`
+    SELECT model, SUM(input_tokens) as total_input, SUM(output_tokens) as total_output, COUNT(*) as count
+    FROM token_usage
+    GROUP BY model
+    ORDER BY total_input + total_output DESC
+  `).all() as any[]
+  return rows.map(r => ({
+    model: r.model,
+    totalInput: r.total_input,
+    totalOutput: r.total_output,
+    count: r.count
+  }))
+}
+
+export interface TokenUsageDaily {
+  date: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+}
+
+export function getTokenUsageDaily(days: number = 30): TokenUsageDaily[] {
+  const since = Date.now() - days * 24 * 60 * 60 * 1000
+  const rows = db!.prepare(`
+    SELECT date(created_at / 1000, 'unixepoch', 'localtime') as day,
+           model,
+           SUM(input_tokens) as input_tokens,
+           SUM(output_tokens) as output_tokens
+    FROM token_usage
+    WHERE created_at >= ?
+    GROUP BY day, model
+    ORDER BY day ASC
+  `).all(since) as any[]
+  return rows.map(r => ({
+    date: r.day,
+    model: r.model,
+    inputTokens: r.input_tokens,
+    outputTokens: r.output_tokens
+  }))
 }

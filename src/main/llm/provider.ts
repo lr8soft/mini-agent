@@ -5,6 +5,12 @@
 import type { ChatMessage, ProviderConfig, ToolCall, ToolDefinition } from '../../shared/types'
 import { mainWindow } from '../index'
 
+export interface TokenUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
 export interface StreamCallbacks {
   onToken?: (token: string) => void
   onComplete?: (fullText: string, toolCalls: ToolCall[]) => void
@@ -29,7 +35,7 @@ export async function streamChat(
   provider: ProviderConfig,
   params: CompletionParams,
   cb?: StreamCallbacks
-): Promise<{ content: string; toolCalls: ToolCall[] }> {
+): Promise<{ content: string; toolCalls: ToolCall[]; usage?: TokenUsage }> {
   const model = params.model || provider.defaultModel
   const body: Record<string, unknown> = {
     model,
@@ -45,7 +51,8 @@ export async function streamChat(
       if (m.name) msg.name = m.name
       return msg
     }),
-    stream: true
+    stream: true,
+    stream_options: { include_usage: true }
   }
   if (params.tools?.length) {
     body.tools = params.tools
@@ -59,6 +66,8 @@ export async function streamChat(
   const url = `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`
   let fullText = ''
   const toolCallsMap = new Map<number, ToolCall>()
+
+  let lastUsage: TokenUsage | undefined
 
   try {
     const resp = await fetch(url, {
@@ -98,6 +107,16 @@ export async function streamChat(
         try {
           const json = JSON.parse(data)
           const delta = json.choices?.[0]?.delta
+
+          // 提取 usage（OpenAI 兼容 API 在 stream_options.include_usage=true 时，最后一个 chunk 包含 usage）
+          if (json.usage) {
+            lastUsage = {
+              prompt_tokens: json.usage.prompt_tokens || 0,
+              completion_tokens: json.usage.completion_tokens || 0,
+              total_tokens: json.usage.total_tokens || 0
+            }
+          }
+
           if (!delta) continue
 
           // 文本增量
@@ -131,12 +150,12 @@ export async function streamChat(
 
     const toolCalls = Array.from(toolCallsMap.values())
     cb?.onComplete?.(fullText, toolCalls)
-    return { content: fullText, toolCalls }
+    return { content: fullText, toolCalls, usage: lastUsage }
   } catch (err) {
     const error = err as Error
     if (error.name === 'AbortError') {
       cb?.onComplete?.(fullText, Array.from(toolCallsMap.values()))
-      return { content: fullText, toolCalls: Array.from(toolCallsMap.values()) }
+      return { content: fullText, toolCalls: Array.from(toolCallsMap.values()), usage: lastUsage }
     }
     cb?.onError?.(error)
     throw error

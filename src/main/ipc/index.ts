@@ -6,7 +6,7 @@ import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import type { AppSettings, ChatMessage } from '../../shared/types'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter, type AgentEventCallbacks } from '../agent/runner'
-import { log } from '../llm/provider'
+import { log, type TokenUsage } from '../llm/provider'
 import { registerTool, clearTools } from '../tools/registry'
 import { builtinTools } from '../tools/builtin'
 import { browserTools } from '../tools/browser'
@@ -160,6 +160,15 @@ export function setupIpc(win: BrowserWindow): void {
         streamingMsgId = msgId
         streamingContent = content || ''
       },
+      onTokenUsage: (usage: TokenUsage, model: string) => {
+        db.addTokenUsage({
+          sessionId,
+          model,
+          inputTokens: usage.prompt_tokens,
+          outputTokens: usage.completion_tokens,
+          createdAt: Date.now()
+        })
+      },
       onComplete: () => {
         // 最终 assistant 文本已在 onAssistantMessage 存入 DB
         // 如果最后一轮没有 toolCalls（纯文本回复），onAssistantMessage 已存
@@ -225,11 +234,15 @@ export function setupIpc(win: BrowserWindow): void {
     }
 
     try {
+      // 获取 session 的工作目录（优先用 session 的，没有再用 settings 的默认值）
+      const session = db.getSession(sessionId)
+      const workspacePath = session?.workspacePath || settings.workspacePath
+
       await runAgent(
         {
           messages: chatMessages,
           provider,
-          workspacePath: settings.workspacePath,
+          workspacePath,
           sessionId,
           permissionCheck,
           signal: abortController.signal,
@@ -305,6 +318,25 @@ export function setupIpc(win: BrowserWindow): void {
 
   ipcMain.handle('shell:openExternal', (_e, url: string) => {
     shell.openExternal(url)
+    return true
+  })
+
+  // ============================================================
+  // Token Usage 查询
+  // ============================================================
+  ipcMain.handle('token:summary', () => {
+    return db.getTokenUsageSummary()
+  })
+
+  ipcMain.handle('token:daily', (_e, days?: number) => {
+    return db.getTokenUsageDaily(days || 30)
+  })
+
+  // ============================================================
+  // Session Workspace 更新
+  // ============================================================
+  ipcMain.handle('session:updateWorkspace', (_e, id: string, workspacePath: string) => {
+    db.updateSessionWorkspace(id, workspacePath)
     return true
   })
 

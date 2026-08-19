@@ -23,6 +23,8 @@ export default {
     welcome: '下にメッセージを入力して会話を開始してください。',
     welcomeHint: 'エージェントはファイルの読み取り、コマンドの実行、MCPツールの使用が可能です。',
     inputPlaceholder: 'メッセージを送信... (Enter で送信、Shift+Enter で改行)',
+    workspace: 'ワークスペース',
+    changeWorkspace: '変更',
     defaultModel: '(デフォルトモデル)',
     selectModelHint: 'モデルを選択 (空 = プロバイダーのデフォルト)',
     modelDefaultSuffix: '(デフォルト)'
@@ -45,6 +47,7 @@ export default {
       mcp: 'MCP サーバー',
       skills: 'スキル',
       memory: 'メモリ',
+      usage: '使用量',
       general: '一般'
     },
     save: '設定を保存',
@@ -124,6 +127,16 @@ export default {
       language: '言語',
       languageHint: 'インターフェース言語。初回起動時にシステム言語を自動検出。',
       autoDetect: '自動 (システム)'
+    },
+    usage: {
+      hint: 'トークン使用量統計。各LLM呼び出しのinput/outputトークンが自動記録されます。',
+      noData: '使用量データがありません。メッセージ送信後に自動記録されます。',
+      model: 'モデル',
+      inputTokens: '入力トークン',
+      outputTokens: '出力トークン',
+      totalTokens: '合計トークン',
+      requests: 'リクエスト数',
+      dailyChart: '日次使用量推移 (過去30日間)'
     }
   }
 }

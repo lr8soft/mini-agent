@@ -66,6 +66,7 @@ export interface Session {
   createdAt: number
   updatedAt: number
   messageCount: number
+  workspacePath?: string
 }
 
 /** 工具描述（供 LLM function-calling） */

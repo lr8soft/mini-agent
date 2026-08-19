@@ -23,6 +23,8 @@ export default {
     welcome: 'Type a message below to start a conversation.',
     welcomeHint: 'The agent can read files, run commands, and use MCP tools.',
     inputPlaceholder: 'Send a message... (Enter to send, Shift+Enter for newline)',
+    workspace: 'Workspace',
+    changeWorkspace: 'Change',
     defaultModel: '(Default Model)',
     selectModelHint: 'Select model (empty = provider default)',
     modelDefaultSuffix: '(default)'
@@ -45,6 +47,7 @@ export default {
       mcp: 'MCP Servers',
       skills: 'Skills',
       memory: 'Memory',
+      usage: 'Usage',
       general: 'General'
     },
     save: 'Save Settings',
@@ -124,6 +127,16 @@ export default {
       language: 'Language',
       languageHint: 'Interface language. Auto-detects system language on first launch.',
       autoDetect: 'Auto (System)'
+    },
+    usage: {
+      hint: 'Token usage statistics. Input/output tokens are recorded for each LLM call automatically.',
+      noData: 'No usage data yet. Data will be recorded after you send messages.',
+      model: 'Model',
+      inputTokens: 'Input Tokens',
+      outputTokens: 'Output Tokens',
+      totalTokens: 'Total Tokens',
+      requests: 'Requests',
+      dailyChart: 'Daily Usage Trend (Last 30 Days)'
     }
   }
 }

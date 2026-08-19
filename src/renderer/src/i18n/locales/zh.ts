@@ -23,6 +23,8 @@ export default {
     welcome: '在下方输入消息开始对话。',
     welcomeHint: 'Agent 可以读取文件、运行命令、使用 MCP 工具。',
     inputPlaceholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
+    workspace: '目录',
+    changeWorkspace: '切换',
     defaultModel: '(默认模型)',
     selectModelHint: '选择模型（留空 = 使用 Provider 默认）',
     modelDefaultSuffix: '(默认)'
@@ -45,6 +47,7 @@ export default {
       mcp: 'MCP 服务器',
       skills: 'Skills',
       memory: '记忆',
+      usage: '用量',
       general: '通用'
     },
     save: '保存设置',
@@ -124,6 +127,16 @@ export default {
       language: '语言',
       languageHint: '界面语言。首次启动时自动检测系统语言。',
       autoDetect: '自动 (跟随系统)'
+    },
+    usage: {
+      hint: 'Token 用量统计。每次 LLM 调用的 input/output tokens 自动记录。',
+      noData: '暂无用量数据。发送消息后将自动记录。',
+      model: '模型',
+      inputTokens: '输入 Tokens',
+      outputTokens: '输出 Tokens',
+      totalTokens: '总 Tokens',
+      requests: '请求次数',
+      dailyChart: '每日用量趋势 (近 30 天)'
     }
   }
 }

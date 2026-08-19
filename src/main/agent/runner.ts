@@ -3,7 +3,7 @@
 // 核心流程: 用户输入 → LLM → (tool_calls? → 执行工具 → 回传结果 → LLM)* → 最终回答
 // ============================================================
 import type { ChatMessage, ContentPart, ProviderConfig, ToolCall } from '../../shared/types'
-import { streamChat, log } from '../llm/provider'
+import { streamChat, log, type TokenUsage } from '../llm/provider'
 import { getTool, getAllTools, getToolPermission, getToolsBySource, type ToolContext } from '../tools/registry'
 import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
@@ -26,6 +26,8 @@ export interface AgentEventCallbacks {
   onToolResult?: (toolCallId: string, toolName: string, result: string, isError: boolean, durationMs: number) => void
   /** 一轮 LLM 调用完成（可能继续循环或结束） */
   onAssistantMessage?: (content: string, toolCalls: ToolCall[]) => void
+  /** Token 用量回调 */
+  onTokenUsage?: (usage: TokenUsage, model: string) => void
   /** 整个对话完成 */
   onComplete?: () => void
   /** 出错 */
@@ -95,10 +97,11 @@ export async function runAgent(
     }
 
     const tools = getAllTools()
-    const { content, toolCalls } = await streamChat(provider, {
+    const model = modelOverride || provider.defaultModel
+    const { content, toolCalls, usage } = await streamChat(provider, {
       messages: workingMessages,
       tools: tools.length > 0 ? tools : undefined,
-      model: modelOverride,
+      model,
       temperature: provider.temperature,
       reasoningEffort: provider.reasoningEnabled ? provider.reasoningEffort : undefined,
       signal
@@ -106,6 +109,11 @@ export async function runAgent(
       onToken: cb.onToken,
       onError: cb.onError
     })
+
+    // 回传 token 用量
+    if (usage) {
+      cb.onTokenUsage?.(usage, model)
+    }
 
     cb.onAssistantMessage?.(content, toolCalls)
 

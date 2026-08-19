@@ -10,6 +10,19 @@ export default function ChatView() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // 当前 session 的工作目录
+  const activeSession = sessions.find(s => s.id === activeSessionId)
+  const workspacePath = activeSession?.workspacePath || settings.workspacePath
+
+  const handleChangeWorkspace = async () => {
+    const dir = await window.api.settings.pickDirectory()
+    if (dir && activeSessionId) {
+      await window.api.session.updateWorkspace(activeSessionId, dir)
+      // 重新加载 sessions 列表以更新 workspacePath
+      useAppStore.getState().loadSessions()
+    }
+  }
+
   // 自动滚到底部
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,8 +79,18 @@ export default function ChatView() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-muted">{t('chat.session')}</span>
           <span className="text-sm text-text-primary truncate max-w-xs">
-            {sessions.find(s => s.id === activeSessionId)?.title || t('chat.newSession')}
+            {activeSession?.title || t('chat.newSession')}
           </span>
+          <span className="text-text-muted">|</span>
+          <span className="text-xs text-text-muted font-mono truncate max-w-[200px]" title={workspacePath}>
+            {t('chat.workspace')} {workspacePath}
+          </span>
+          <button
+            onClick={handleChangeWorkspace}
+            className="text-xs text-accent hover:text-accent-glow underline"
+          >
+            {t('chat.changeWorkspace')}
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {/* 自动批准开关 */}
