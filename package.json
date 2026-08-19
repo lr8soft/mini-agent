@@ -76,7 +76,13 @@
       {
         "from": "node_modules/playwright-core/.local-browsers",
         "to": "browsers",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*",
+          "!chromium_headless_shell-*/**",
+          "!winldd-*/**",
+          "!.links/**",
+          "!__dirlock"
+        ]
       }
     ],
     "win": {
