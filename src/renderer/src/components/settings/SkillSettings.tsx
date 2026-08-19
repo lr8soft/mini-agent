@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { FileText, Plus, Trash2 } from 'lucide-react'
 import type { SkillConfig } from '@shared/types'
 
 interface Props {
@@ -32,31 +33,45 @@ export function SkillSettings({ skills, onChange }: Props) {
     onChange(next)
   }
 
-  // @ts-ignore
-  // @ts-ignore
   return (
     <div>
-      <p className="text-xs text-text-muted mb-4">
-        {t('settings.skills.hint')}
-      </p>
+      <p className="form-hint" style={{ marginBottom: 14 }}>{t('settings.skills.hint')}</p>
 
       {skills.map((s, i) => (
-        <div key={s.id} className="bg-bg-card border border-border rounded-lg p-4 mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-text-primary">{s.name}</p>
-            <p className="text-xs text-text-muted font-mono truncate max-w-sm">{s.path}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1 text-xs cursor-pointer">
-              <input type="checkbox" checked={s.enabled} onChange={() => toggleSkill(i)} />
-              <span className="text-text-secondary">{s.enabled ? t('settings.skills.on') : t('settings.skills.off')}</span>
-            </label>
-            <button onClick={() => removeSkill(i)} className="text-xs text-err hover:underline">{t('settings.skills.remove')}</button>
+        <div key={s.id} className="memory-card">
+          <div className="memory-card-head">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+              <FileText size={15} style={{ color: 'var(--app-color-primary-strong)', flex: '0 0 auto' }} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: '0.867rem', fontWeight: 650 }}>{s.name}</p>
+                <p className="form-hint" style={{ fontFamily: 'Consolas, Monaco, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420 }}>
+                  {s.path}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  className="switch"
+                  checked={s.enabled}
+                  onChange={() => toggleSkill(i)}
+                />
+                <span className="form-label">{s.enabled ? t('settings.skills.on') : t('settings.skills.off')}</span>
+              </label>
+              <button onClick={() => removeSkill(i)} className="danger-link">
+                <Trash2 size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+                {t('settings.skills.remove')}
+              </button>
+            </div>
           </div>
         </div>
       ))}
 
-      <button onClick={addSkill} className="btn-ghost w-full mt-2">{t('settings.skills.addSkill')}</button>
+      <button onClick={addSkill} className="btn-ghost" style={{ width: '100%', marginTop: 8 }}>
+        <Plus size={14} />
+        {t('settings.skills.addSkill')}
+      </button>
     </div>
   )
 }

@@ -16,7 +16,7 @@ interface TokenUsageDaily {
   outputTokens: number
 }
 
-const MODEL_COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#ef4444', '#10b981', '#a855f7', '#ec4899', '#14b8a6']
+const MODEL_COLORS = ['#1389c9', '#0e9aa7', '#c18a2e', '#d23b4c', '#13875d', '#7c5cd6', '#ec4899', '#14b8a6']
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -69,7 +69,7 @@ export function UsageSettings() {
 
   if (summary.length === 0 && daily.length === 0) {
     return (
-      <div className="text-center py-12 text-text-muted text-sm">
+      <div className="memory-empty">
         {t('settings.usage.noData')}
       </div>
     )
@@ -77,28 +77,28 @@ export function UsageSettings() {
 
   return (
     <div>
-      <p className="text-xs text-text-muted mb-4">{t('settings.usage.hint')}</p>
+      <p className="form-hint" style={{ marginBottom: 14 }}>{t('settings.usage.hint')}</p>
 
       {/* 汇总表格 */}
-      <div className="bg-bg-card border border-border rounded-lg overflow-hidden mb-6">
-        <table className="w-full text-sm">
+      <div className="usage-table-wrap">
+        <table className="usage-table">
           <thead>
-            <tr className="border-b border-border text-text-muted text-xs">
-              <th className="px-4 py-2 text-left">{t('settings.usage.model')}</th>
-              <th className="px-4 py-2 text-right">{t('settings.usage.inputTokens')}</th>
-              <th className="px-4 py-2 text-right">{t('settings.usage.outputTokens')}</th>
-              <th className="px-4 py-2 text-right">{t('settings.usage.totalTokens')}</th>
-              <th className="px-4 py-2 text-right">{t('settings.usage.requests')}</th>
+            <tr>
+              <th>{t('settings.usage.model')}</th>
+              <th>{t('settings.usage.inputTokens')}</th>
+              <th>{t('settings.usage.outputTokens')}</th>
+              <th>{t('settings.usage.totalTokens')}</th>
+              <th>{t('settings.usage.requests')}</th>
             </tr>
           </thead>
           <tbody>
             {summary.map((row) => (
-              <tr key={row.model} className="border-b border-border/50 last:border-0">
-                <td className="px-4 py-2 text-text-primary font-mono">{row.model}</td>
-                <td className="px-4 py-2 text-right text-cyan-400">{formatNumber(row.totalInput)}</td>
-                <td className="px-4 py-2 text-right text-amber-400">{formatNumber(row.totalOutput)}</td>
-                <td className="px-4 py-2 text-right text-text-primary">{formatNumber(row.totalInput + row.totalOutput)}</td>
-                <td className="px-4 py-2 text-right text-text-secondary">{row.count}</td>
+              <tr key={row.model}>
+                <td>{row.model}</td>
+                <td className="num-input">{formatNumber(row.totalInput)}</td>
+                <td className="num-output">{formatNumber(row.totalOutput)}</td>
+                <td className="num-total">{formatNumber(row.totalInput + row.totalOutput)}</td>
+                <td className="num-count">{row.count}</td>
               </tr>
             ))}
           </tbody>
@@ -107,16 +107,21 @@ export function UsageSettings() {
 
       {/* 每日折线图 */}
       {chartData.length > 1 && (
-        <div className="bg-bg-card border border-border rounded-lg p-4">
-          <h3 className="text-sm text-text-primary mb-4">{t('settings.usage.dailyChart')}</h3>
+        <div className="chart-panel">
+          <h3>{t('settings.usage.dailyChart')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#888' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#888' }} tickFormatter={v => formatCompact(v)} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--app-color-border)" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--app-color-text-mute)' }} stroke="var(--app-color-border-strong)" />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--app-color-text-mute)' }} tickFormatter={v => formatCompact(Number(v))} stroke="var(--app-color-border-strong)" />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
-                labelStyle={{ color: '#ccc' }}
+                contentStyle={{
+                  background: 'var(--app-color-surface-solid)',
+                  border: '1px solid var(--app-color-border-strong)',
+                  borderRadius: 6,
+                  fontSize: 12
+                }}
+                labelStyle={{ color: 'var(--app-color-text)' }}
                 formatter={(value, name) => [formatNumber(Number(value) || 0), String(name ?? '')]}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />

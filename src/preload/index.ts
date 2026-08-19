@@ -27,6 +27,25 @@ const api = {
   },
 
   // ============================================================
+  // 窗口控制（无边框自定义标题栏）
+  // ============================================================
+  window: {
+    minimize: (): Promise<void> =>
+      ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: (): Promise<boolean> =>
+      ipcRenderer.invoke('window:toggle-maximize'),
+    close: (): Promise<void> =>
+      ipcRenderer.invoke('window:close'),
+    isMaximized: (): Promise<boolean> =>
+      ipcRenderer.invoke('window:is-maximized'),
+    onMaximizedChange: (cb: (maximized: boolean) => void) => {
+      const handler = (_e: any, maximized: boolean) => cb(maximized)
+      ipcRenderer.on('window:maximized-change', handler)
+      return () => { ipcRenderer.removeListener('window:maximized-change', handler) }
+    }
+  },
+
+  // ============================================================
   // Agent 对话
   // ============================================================
   agent: {

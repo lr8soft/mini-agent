@@ -3,6 +3,12 @@ export default {
   app: {
     name: 'MiniAgent'
   },
+  window: {
+    minimize: '最小化',
+    maximize: '最大化',
+    restore: '元に戻す',
+    close: '閉じる'
+  },
   sidebar: {
     newSession: '新しいセッション',
     noSessions: 'セッションがありません',
@@ -126,7 +132,16 @@ export default {
       workspaceHint: 'エージェントが作業するルートディレクトリ。ファイルツールはこのパスに相対。',
       language: '言語',
       languageHint: 'インターフェース言語。初回起動時にシステム言語を自動検出。',
-      autoDetect: '自動 (システム)'
+      autoDetect: '自動 (システム)',
+      appearance: '外観',
+      appearanceHint: 'テーマとフォントサイズ',
+      theme: 'テーマ',
+      themeSystem: 'システム',
+      themeLight: 'ライト',
+      themeDark: 'ダーク',
+      fontSize: 'フォントサイズ',
+      fontSizeHint: 'すべてのUIテキストを等比例的に拡大縮小します。即座に反映され、記憶されます。',
+      fontSizeOption: '{{px}} px'
     },
     usage: {
       hint: 'トークン使用量統計。各LLM呼び出しのinput/outputトークンが自動記録されます。',

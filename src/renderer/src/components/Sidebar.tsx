@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { Bot, MessageSquare, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useAppStore } from '../store'
 
 export default function Sidebar() {
@@ -6,60 +7,51 @@ export default function Sidebar() {
   const { sessions, activeSessionId, setActiveSession, createSession, deleteSession, setView, view } = useAppStore()
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-bg-panel border-r border-border flex flex-col">
-      {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h1 className="text-sm font-bold tracking-wide text-text-primary">
-          {t('app.name')}
-        </h1>
-        <button
-          onClick={createSession}
-          className="text-text-muted hover:text-accent-glow transition-colors text-lg"
-          title={t('sidebar.newSession')}
-        >
-          +
-        </button>
+    <aside className="sidebar">
+      {/* 品牌 */}
+      <div className="brand">
+        <span className="brand-mark"><Bot size={19} /></span>
+        <strong>{t('app.name')}</strong>
       </div>
+
+      {/* 新建会话 */}
+      <button className="new-session-button" onClick={createSession} title={t('sidebar.newSession')}>
+        <Plus size={15} />
+        {t('sidebar.newSession')}
+      </button>
 
       {/* 会话列表 */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <nav className="session-nav" aria-label={t('app.name')}>
         {sessions.length === 0 && (
-          <p className="text-xs text-text-muted text-center py-8">{t('sidebar.noSessions')}</p>
+          <p className="sidebar-empty">{t('sidebar.noSessions')}</p>
         )}
         {sessions.map((s) => (
-          <div
+          <button
             key={s.id}
-            className={`group flex items-center gap-2 px-4 py-2 cursor-pointer transition-colors ${
-              s.id === activeSessionId
-                ? 'bg-bg-hover text-text-primary'
-                : 'text-text-secondary hover:bg-bg-hover/50 hover:text-text-primary'
-            }`}
+            className={s.id === activeSessionId ? 'active' : ''}
             onClick={() => setActiveSession(s.id)}
           >
-            <span className="text-xs opacity-50">⌘</span>
-            <span className="text-sm truncate flex-1">{s.title}</span>
-            <button
-              className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-err transition-opacity text-xs"
-              onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
+            <MessageSquare size={15} />
+            <span>{s.title}</span>
+            <span
+              className="session-delete"
               title={t('sidebar.deleteSession')}
+              onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
             >
-              ✕
-            </button>
-          </div>
+              <Trash2 size={12} />
+            </span>
+          </button>
         ))}
-      </div>
+      </nav>
 
-      {/* 底部 */}
-      <div className="border-t border-border p-2">
-        <button
-          onClick={() => setView(view === 'settings' ? 'chat' : 'settings')}
-          className={`w-full btn-ghost text-xs text-left px-3 py-2 ${
-            view === 'settings' ? 'bg-bg-hover text-accent-glow' : ''
-          }`}
-        >
-          ⚙ {t('sidebar.settings')}
-        </button>
-      </div>
+      {/* 底部设置入口 */}
+      <button
+        className={view === 'settings' ? 'sidebar-settings active' : 'sidebar-settings'}
+        onClick={() => setView(view === 'settings' ? 'chat' : 'settings')}
+      >
+        <Settings2 size={15} />
+        {t('sidebar.settings')}
+      </button>
     </aside>
   )
 }

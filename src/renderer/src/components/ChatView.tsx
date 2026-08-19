@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Bot, FolderOpen, Send, ShieldCheck, ShieldOff, Square } from 'lucide-react'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
 
@@ -57,95 +58,109 @@ export default function ChatView() {
     }
   }
 
+  // 工具调用状态：从工具结果消息按 toolCallId 匹配
+  const toolStatuses = useMemo(() => {
+    const map: Record<string, 'done' | 'error'> = {}
+    for (const m of messages) {
+      if (m.role === 'tool' && m.toolCallId) {
+        map[m.toolCallId] = m.status === 'error' ? 'error' : 'done'
+      }
+    }
+    return map
+  }, [messages])
+
   // 无活跃会话
   if (!activeSessionId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-        <div className="text-center">
-          <p className="text-2xl mb-3">⌬</p>
-          <p className="mb-4">{t('chat.createSessionToStart')}</p>
-          <button onClick={() => useAppStore.getState().createSession()} className="btn-primary">
-            {t('chat.newSession')}
-          </button>
+      <div className="chat-view">
+        <div className="chat-messages" style={{ flex: 1 }}>
+          <div className="chat-empty">
+            <span className="empty-mark"><Bot size={26} /></span>
+            <h2>{t('app.name')}</h2>
+            <p>{t('chat.createSessionToStart')}</p>
+            <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => useAppStore.getState().createSession()}>
+              {t('chat.newSession')}
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="chat-view">
       {/* 顶部栏 */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-bg-panel/50">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-muted">{t('chat.session')}</span>
-          <span className="text-sm text-text-primary truncate max-w-xs">
-            {activeSession?.title || t('chat.newSession')}
+      <div className="chat-topbar">
+        <div className="chat-topbar-left">
+          <span className="chat-session-label">{t('chat.session')}</span>
+          <span className="chat-session-title">{activeSession?.title || t('chat.newSession')}</span>
+          <span className="chat-topbar-sep">|</span>
+          <span className="chat-workspace" title={workspacePath}>
+            <FolderOpen size={13} />
+            <span>{workspacePath}</span>
           </span>
-          <span className="text-text-muted">|</span>
-          <span className="text-xs text-text-muted font-mono truncate max-w-[200px]" title={workspacePath}>
-            {t('chat.workspace')} {workspacePath}
-          </span>
-          <button
-            onClick={handleChangeWorkspace}
-            className="text-xs text-accent hover:text-accent-glow underline"
-          >
+          <button className="chat-workspace-change" onClick={handleChangeWorkspace}>
             {t('chat.changeWorkspace')}
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="chat-topbar-right">
           {/* 自动批准开关 */}
           <button
+            className={autoApprove ? 'toggle-chip active' : 'toggle-chip'}
             onClick={() => setAutoApprove(!autoApprove)}
-            className={`text-xs px-2 py-1 rounded-md border transition-colors ${
-              autoApprove
-                ? 'bg-accent/20 border-accent text-accent-glow'
-                : 'border-border text-text-muted hover:text-text-primary'
-            }`}
             title={autoApprove ? t('chat.autoApproveOnHint') : t('chat.autoApproveOffHint')}
           >
+            {autoApprove ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
             {autoApprove ? t('chat.autoApproveOn') : t('chat.autoApproveOff')}
           </button>
           {isRunning && (
             <>
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-xs text-text-muted">{t('chat.thinking')}</span>
-              <button onClick={abortAgent} className="btn-danger text-xs">{t('chat.stop')}</button>
+              <span className="thinking">
+                <span className="pulse-dot" />
+                {t('chat.thinking')}
+              </span>
+              <button className="btn-danger btn-sm" onClick={abortAgent}>
+                <Square size={11} />
+                {t('chat.stop')}
+              </button>
             </>
           )}
         </div>
       </div>
 
       {/* 消息流 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && (
-          <div className="text-center text-text-muted text-sm py-20">
-            <p className="text-3xl mb-4">⌬</p>
-            <p className="text-base font-medium text-text-primary mb-2">{t('app.name')}</p>
-            <p>{t('chat.welcome')}</p>
-            <p className="mt-1 text-xs">{t('chat.welcomeHint')}</p>
-          </div>
-        )}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
+      <div ref={scrollRef} className="chat-messages">
+        <div className="chat-inner">
+          {messages.length === 0 && (
+            <div className="chat-empty">
+              <span className="empty-mark"><Bot size={26} /></span>
+              <h2>{t('app.name')}</h2>
+              <p>{t('chat.welcome')}</p>
+              <small>{t('chat.welcomeHint')}</small>
+            </div>
+          )}
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} toolStatuses={toolStatuses} />
+          ))}
+        </div>
       </div>
 
       {/* 输入区 */}
-      <div className="border-t border-border bg-bg-panel p-4">
-        <div className="max-w-4xl mx-auto flex gap-3 items-end">
+      <div className="chat-input-area">
+        <div className="chat-input-row">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('chat.inputPlaceholder')}
-            className="input-field flex-1 resize-none min-h-[42px] max-h-[200px] font-mono text-sm"
+            className="chat-textarea"
             rows={1}
             disabled={isRunning}
           />
           {/* Provider/模型选择下拉框 */}
           <select
-            className="input-field h-[42px] text-sm min-w-[140px]"
+            className="model-select"
             value={selectedProviderModel || ''}
             onChange={(e) => setSelectedProviderModel(e.target.value || null)}
             title={t('chat.selectModelHint')}
@@ -160,10 +175,11 @@ export default function ChatView() {
               ))}
           </select>
           <button
+            className="send-button"
             onClick={handleSubmit}
             disabled={!input.trim() || isRunning}
-            className="btn-primary h-[42px] px-5"
           >
+            <Send size={15} />
             {t('chat.send')}
           </button>
         </div>

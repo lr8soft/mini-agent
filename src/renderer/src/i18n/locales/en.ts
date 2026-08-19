@@ -3,6 +3,12 @@ export default {
   app: {
     name: 'MiniAgent'
   },
+  window: {
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+    restore: 'Restore',
+    close: 'Close'
+  },
   sidebar: {
     newSession: 'New session',
     noSessions: 'No sessions yet',
@@ -126,7 +132,16 @@ export default {
       workspaceHint: 'The root directory the agent will work in. File tools are relative to this path.',
       language: 'Language',
       languageHint: 'Interface language. Auto-detects system language on first launch.',
-      autoDetect: 'Auto (System)'
+      autoDetect: 'Auto (System)',
+      appearance: 'Appearance',
+      appearanceHint: 'Theme and interface font size',
+      theme: 'Theme',
+      themeSystem: 'System',
+      themeLight: 'Light',
+      themeDark: 'Dark',
+      fontSize: 'Font Size',
+      fontSizeHint: 'Scales all interface text. Applies immediately and is remembered.',
+      fontSizeOption: '{{px}} px'
     },
     usage: {
       hint: 'Token usage statistics. Input/output tokens are recorded for each LLM call automatically.',

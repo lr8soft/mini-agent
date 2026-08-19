@@ -18,9 +18,10 @@ function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    frame: false,
     autoHideMenuBar: true,
     title: 'MiniAgent',
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#f5f6f8',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       sandbox: false,

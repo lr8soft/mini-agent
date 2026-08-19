@@ -6,6 +6,33 @@ import type { Session, UIMessage, AppSettings, ToolCall } from '@shared/types'
 
 const api = window.api
 
+// ---------- 主题 / 字号 ----------
+export type Theme = 'light' | 'dark' | 'system'
+
+export const THEME_STORAGE_KEY = 'miniagent.theme'
+export const FONT_SIZE_STORAGE_KEY = 'miniagent.fontSize'
+/** 可选字号（px，作用于根字号，全局 rem 等比缩放） */
+export const FONT_SIZE_OPTIONS = [13, 14, 15, 16, 18]
+export const DEFAULT_FONT_SIZE = 15
+
+function getStoredTheme(): Theme {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY)
+    return stored === 'light' || stored === 'dark' ? stored : 'system'
+  } catch {
+    return 'system'
+  }
+}
+
+function getStoredFontSize(): number {
+  try {
+    const stored = parseInt(localStorage.getItem(FONT_SIZE_STORAGE_KEY) || '', 10)
+    return FONT_SIZE_OPTIONS.includes(stored) ? stored : DEFAULT_FONT_SIZE
+  } catch {
+    return DEFAULT_FONT_SIZE
+  }
+}
+
 interface PermissionRequest {
   permId: string
   toolName: string
@@ -16,6 +43,13 @@ interface AppState {
   // 视图
   view: 'chat' | 'settings'
   setView: (v: 'chat' | 'settings') => void
+
+  // 主题（light/dark/system，system 跟随系统）
+  theme: Theme
+  setTheme: (t: Theme) => void
+  // 字号（px，根字号）
+  fontSize: number
+  setFontSize: (n: number) => void
 
   // 会话
   sessions: Session[]
@@ -59,6 +93,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---- 视图 ----
   view: 'chat',
   setView: (v) => set({ view: v }),
+
+  // ---- 主题 / 字号 ----
+  theme: getStoredTheme(),
+  setTheme: (t) => set({ theme: t }),
+  fontSize: getStoredFontSize(),
+  setFontSize: (n) => set({ fontSize: n }),
 
   // ---- 会话 ----
   sessions: [],

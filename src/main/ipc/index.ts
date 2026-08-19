@@ -29,6 +29,24 @@ const pendingPermissions = new Map<string, { resolve: (ok: boolean) => void }>()
 export function setupIpc(win: BrowserWindow): void {
   mainWindow = win
 
+  // ============================================================
+  // 窗口控制（无边框自定义标题栏）
+  // ============================================================
+  ipcMain.handle('window:minimize', () => {
+    win.minimize()
+  })
+  ipcMain.handle('window:toggle-maximize', () => {
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+    return win.isMaximized()
+  })
+  ipcMain.handle('window:close', () => {
+    win.close()
+  })
+  ipcMain.handle('window:is-maximized', () => win.isMaximized())
+  win.on('maximize', () => win.webContents.send('window:maximized-change', true))
+  win.on('unmaximize', () => win.webContents.send('window:maximized-change', false))
+
   // 注册内置工具
   clearTools()
   for (const { name, handler } of builtinTools) {

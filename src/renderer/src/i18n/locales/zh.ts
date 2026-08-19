@@ -3,6 +3,12 @@ export default {
   app: {
     name: 'MiniAgent'
   },
+  window: {
+    minimize: '最小化',
+    maximize: '最大化',
+    restore: '还原',
+    close: '关闭'
+  },
   sidebar: {
     newSession: '新建会话',
     noSessions: '暂无会话',
@@ -126,7 +132,16 @@ export default {
       workspaceHint: 'Agent 工作的根目录。文件工具都相对于此路径。',
       language: '语言',
       languageHint: '界面语言。首次启动时自动检测系统语言。',
-      autoDetect: '自动 (跟随系统)'
+      autoDetect: '自动 (跟随系统)',
+      appearance: '外观',
+      appearanceHint: '主题与界面字号',
+      theme: '主题',
+      themeSystem: '跟随系统',
+      themeLight: '浅色',
+      themeDark: '深色',
+      fontSize: '字号',
+      fontSizeHint: '等比缩放全部界面文字，立即生效并记住。',
+      fontSizeOption: '{{px}} 像素'
     },
     usage: {
       hint: 'Token 用量统计。每次 LLM 调用的 input/output tokens 自动记录。',

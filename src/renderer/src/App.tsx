@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
-import { useAppStore } from './store'
+import { useAppStore, THEME_STORAGE_KEY, FONT_SIZE_STORAGE_KEY } from './store'
 import i18n, { getEffectiveLanguage, storeLanguage, type AppLanguage } from './i18n'
+import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import SettingsView from './components/SettingsView'
 import PermissionDialog from './components/PermissionDialog'
 
 export default function App() {
-  const { view, loadSessions, loadSettings, setActiveSession } = useAppStore()
+  const { view, loadSessions, loadSettings, setActiveSession, theme, fontSize } = useAppStore()
 
   // 初始化
   useEffect(() => {
@@ -28,6 +29,25 @@ export default function App() {
       }
     })
   }, [])
+
+  // 主题：light / dark / system（system 实时跟随系统深浅色）
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = () => {
+      const dark = theme === 'dark' || (theme === 'system' && media.matches)
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+    }
+    applyTheme()
+    media.addEventListener('change', applyTheme)
+    try { localStorage.setItem(THEME_STORAGE_KEY, theme) } catch { /* ignore */ }
+    return () => media.removeEventListener('change', applyTheme)
+  }, [theme])
+
+  // 字号：设置根字号，全局 rem 等比缩放
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${fontSize}px`
+    try { localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize)) } catch { /* ignore */ }
+  }, [fontSize])
 
   // 注册 IPC 事件
   useEffect(() => {
@@ -81,7 +101,8 @@ export default function App() {
             sessionId: s.activeSessionId || '',
             role: 'tool',
             content: result,
-            toolCallId: toolName || toolCallId,
+            toolCallId,
+            toolName,
             timestamp: Date.now(),
             status: isError ? 'error' : 'done'
           })
@@ -129,14 +150,19 @@ export default function App() {
   }, [])
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
-      {/* 侧边栏 */}
-      <Sidebar />
+    <div className="app-frame">
+      {/* 自定义窗口标题栏 */}
+      <TitleBar />
 
-      {/* 主内容区 */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {view === 'chat' ? <ChatView /> : <SettingsView />}
-      </main>
+      <div className="app-shell">
+        {/* 侧边栏 */}
+        <Sidebar />
+
+        {/* 主内容区 */}
+        <main className="main-area">
+          {view === 'chat' ? <ChatView /> : <SettingsView />}
+        </main>
+      </div>
 
       {/* 权限确认弹窗 */}
       <PermissionDialog />
