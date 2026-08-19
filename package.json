@@ -6,6 +6,9 @@
   "author": "mini-agent",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
