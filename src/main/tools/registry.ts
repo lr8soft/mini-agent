@@ -3,8 +3,17 @@
 // ============================================================
 import type { ToolDefinition } from '../../shared/types'
 
+/**
+ * 工具权限等级
+ * - safe:      永远自动放行（只读、无副作用操作）
+ * - normal:    默认需确认，autoApprove 开启时自动放行
+ * - dangerous: 始终需要用户确认，autoApprove 也无法跳过
+ */
+export type PermissionLevel = 'safe' | 'normal' | 'dangerous'
+
 export interface ToolContext {
   workspacePath: string
+  sessionId?: string
   onProgress?: (msg: string) => void
   /** 请求权限（如果用户配置了需要确认），返回是否允许 */
   requestPermission?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
@@ -13,6 +22,8 @@ export interface ToolContext {
 export interface ToolHandler {
   definition: ToolDefinition
   execute: (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>
+  /** 权限等级，默认 normal */
+  permission?: PermissionLevel
 }
 
 /**
@@ -45,4 +56,12 @@ export function clearTools(source?: string) {
   } else {
     registry.clear()
   }
+}
+
+/**
+ * 获取工具的权限等级
+ */
+export function getToolPermission(name: string): PermissionLevel {
+  const entry = registry.get(name)
+  return entry?.handler.permission || 'normal'
 }

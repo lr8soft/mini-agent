@@ -9,11 +9,11 @@ A desktop AI coding agent platform built with Electron + React + TypeScript. Lik
 - **MCP Tool Extension** — Mount [Model Context Protocol](https://modelcontextprotocol.io/) servers (stdio + SSE) for unlimited tool capabilities (Playwright, filesystem, databases, etc.).
 - **Skill Injection** — Load `SKILL.md` files to inject specialized system prompts and workflows into the agent.
 - **ReAct Agent Loop** — Full tool-calling loop: LLM → tool calls → execute → feed back → repeat (up to 20 rounds).
-- **Built-in Tools** — `read`, `write`, `edit`, `bash`, `grep`, `glob`, `ls` — all running locally.
+- **Built-in Tools** — `read`, `write`, `edit`, `bash`, `grep`, `glob`, `ls`, `set_title` — all running locally.
 - **Permission System** — Safe tools auto-approved; dangerous tools require explicit user confirmation. Auto-approve toggle for power users.
 - **Model Switching** — Switch models on-the-fly from the chat bar without changing settings.
 - **Temperature & Reasoning Effort** — Per-provider temperature control and reasoning effort (low/medium/high) with toggle.
-- **Session Persistence** — All conversations stored in local SQLite. Resume anytime.
+- **Browser Automation** — Headless Chromium via Playwright: `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot`, `browser_get_text`, `browser_get_html`, `browser_wait`, `browser_close`.
 - **Dark Terminal Aesthetic** — OpenCode-inspired UI with monospace fonts and purple accent.
 
 ## Tech Stack
@@ -25,6 +25,7 @@ A desktop AI coding agent platform built with Electron + React + TypeScript. Lik
 | UI | React 18 + TypeScript + TailwindCSS |
 | State | Zustand |
 | LLM | Native fetch (OpenAI-compatible `/chat/completions`) |
+| Browser | Playwright (Chromium, headless) |
 | MCP | `@modelcontextprotocol/sdk` |
 | Storage | better-sqlite3 |
 | Skills | gray-matter (frontmatter parsing) |
@@ -168,5 +169,3 @@ Max 20 rounds per conversation to prevent infinite loops.
 ## License
 
 MIT
-
-> AI生成

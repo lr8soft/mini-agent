@@ -16,6 +16,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^11.8.1",
     "gray-matter": "^4.0.3",
+    "playwright": "^1.62.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -43,8 +44,17 @@
   "build": {
     "appId": "com.miniagent.app",
     "productName": "MiniAgent",
-    "directories": { "output": "release" },
-    "files": ["out/**/*"],
-    "win": { "target": ["nsis"], "icon": "build/icon.ico" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    }
   }
 }

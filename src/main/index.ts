@@ -4,8 +4,10 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import * as path from 'node:path'
-import { initDatabase } from './store/db'
+import { initDatabase, getSettings } from './store/db'
 import { setupIpc } from './ipc'
+import { reconnectAllMcpServers } from './mcp/client'
+import { log } from './llm/provider'
 
 export let mainWindow: BrowserWindow | null = null
 
@@ -50,7 +52,7 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 设置应用信息
   electronApp.setAppUserModelId('com.miniagent.app')
 
@@ -66,6 +68,15 @@ app.whenReady().then(() => {
 
   // 设置 IPC
   setupIpc(win)
+
+  // 启动时自动连接已配置的 MCP 服务器
+  const settings = getSettings()
+  if (settings.mcpServers?.length > 0) {
+    log('info', `Auto-connecting ${settings.mcpServers.length} MCP server(s) on startup`)
+    reconnectAllMcpServers(settings.mcpServers).catch((err) => {
+      log('error', `Failed to connect MCP servers on startup: ${err}`)
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

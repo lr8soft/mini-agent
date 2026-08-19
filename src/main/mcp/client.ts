@@ -83,6 +83,8 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
             parameters: tool.inputSchema || { type: 'object', properties: {} }
           }
         },
+        // MCP 工具默认 normal 权限（autoApprove 时自动放行，否则弹窗确认）
+        permission: 'normal',
         async execute(args: Record<string, unknown>, ctx: ToolContext) {
           try {
             const result = await client.callTool({ name: tool.name, arguments: args })

@@ -4,7 +4,7 @@
 // ============================================================
 import type { ChatMessage, ProviderConfig, ToolCall } from '../../shared/types'
 import { streamChat, log } from '../llm/provider'
-import { getTool, getAllTools, type ToolContext } from '../tools/registry'
+import { getTool, getAllTools, getToolPermission, type ToolContext } from '../tools/registry'
 
 const MAX_TOOL_ROUNDS = 20      // 单次对话最大工具调用轮数，防止死循环
 
@@ -33,14 +33,13 @@ export interface AgentRunOptions {
   messages: ChatMessage[]
   provider: ProviderConfig
   workspacePath: string
-  /** 权限回调：返回 true 允许执行 */
+  sessionId?: string
+  /** 权限回调：返回 true 允许执行。决策逻辑由调用方实现（结合 autoApprove 和工具权限等级） */
   permissionCheck?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
   signal?: AbortSignal
   systemPromptExtra?: string
   /** 覆盖模型名（如果用户在聊天页选了别的模型） */
   modelOverride?: string
-  /** 自动批准所有工具调用，跳过权限弹窗 */
-  autoApprove?: boolean
 }
 
 /**
@@ -50,7 +49,7 @@ export async function runAgent(
   opts: AgentRunOptions,
   cb: AgentEventCallbacks
 ): Promise<ChatMessage[]> {
-  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, autoApprove } = opts
+  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, sessionId } = opts
 
   // 构建系统提示词
   const skillsPrompt = skillsPromptGetter ? skillsPromptGetter() : ''
@@ -123,8 +122,9 @@ export async function runAgent(
         }
 
         if (!isError) {
-          // 权限检查（autoApprove 模式跳过）
-          if (permissionCheck && !autoApprove) {
+          // 权限检查 — 统一由 permissionCheck 决策
+          // permissionCheck 内部根据工具权限等级 + autoApprove 判断是否需要弹窗
+          if (permissionCheck) {
             const allowed = await permissionCheck(tc.function.name, parsedArgs)
             if (!allowed) {
               resultText = 'Permission denied by user'
@@ -141,7 +141,7 @@ export async function runAgent(
           }
 
           // 执行工具
-          const ctx: ToolContext = { workspacePath }
+          const ctx: ToolContext = { workspacePath, sessionId }
           const start = Date.now()
           try {
             log('info', `Executing tool: ${tc.function.name}(${JSON.stringify(parsedArgs).slice(0, 200)})`)
@@ -186,6 +186,7 @@ function buildSystemPrompt(workspacePath: string, skillsPrompt: string, extra?: 
 - You are connected to a local workspace at: ${workspacePath}
 - You have access to tools for reading/writing files, running shell commands, and searching code.
 - You also have access to MCP tools and Skills for extended capabilities.
+- You have a headless Chromium browser (via Playwright) with tools: browser_navigate, browser_click, browser_type, browser_screenshot, browser_get_text, browser_get_html, browser_wait, browser_close.
 
 ## Guidelines
 - When the user asks you to work with files, use the appropriate tools to read and modify them.
@@ -194,7 +195,8 @@ function buildSystemPrompt(workspacePath: string, skillsPrompt: string, extra?: 
 - When running shell commands, be aware of the workspace directory context.
 - If a task requires multiple steps, plan your approach first, then execute step by step.
 - Always explain what you're doing and why, especially before running potentially impactful operations.
-- If you're unsure about something, ask the user for clarification.`
+- If you're unsure about something, ask the user for clarification.
+- IMPORTANT: At the start of every new conversation, you MUST call the set_title tool with a short title (max 6 words) that summarizes the user's request. Do this before doing anything else.`
 
   if (skillsPrompt) {
     prompt += skillsPrompt

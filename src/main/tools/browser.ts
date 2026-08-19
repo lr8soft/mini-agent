@@ -1,0 +1,317 @@
+// ============================================================
+// Playwright 浏览器工具集 — 基于 @playwright/test 的 Chromium
+// 工具: browser_navigate / browser_click / browser_type /
+//       browser_screenshot / browser_get_text / browser_wait
+// ============================================================
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
+import type { ToolHandler, ToolContext } from './registry'
+import { log } from '../llm/provider'
+
+// 全局浏览器实例（懒加载，首次调用时启动）
+let browser: Browser | null = null
+let context: BrowserContext | null = null
+let activePage: Page | null = null
+
+async function ensureBrowser(): Promise<Page> {
+  if (!browser) {
+    log('info', '[Playwright] Launching chromium...')
+    browser = await chromium.launch({ headless: true })
+    context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      locale: 'en-US'
+    })
+    activePage = await context.newPage()
+    log('info', '[Playwright] Browser ready')
+  }
+  if (!activePage) {
+    activePage = await context!.newPage()
+  }
+  return activePage
+}
+
+// ---- 导航 ----
+export const browserNavigateTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_navigate',
+      description: '导航到指定 URL。返回页面标题和最终 URL。',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: '要访问的完整 URL' },
+          wait_until: { type: 'string', description: '等待策略: load | domcontentloaded | networkidle (默认 load)' }
+        },
+        required: ['url']
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args) {
+    const url = args.url as string
+    const waitUntil = (args.wait_until as 'load' | 'domcontentloaded' | 'networkidle') || 'load'
+    try {
+      const page = await ensureBrowser()
+      await page.goto(url, { waitUntil, timeout: 30000 })
+      const title = await page.title()
+      return `Navigated to: ${page.url()}\nTitle: ${title}`
+    } catch (err) {
+      return `Error navigating: ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 点击 ----
+export const browserClickTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_click',
+      description: '点击页面上的元素。支持 CSS 选择器或可见文本匹配。',
+      parameters: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS 选择器，如 #button、.class、text=Submit' },
+          timeout: { type: 'number', description: '等待超时毫秒数，默认 10000' }
+        },
+        required: ['selector']
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args) {
+    const selector = args.selector as string
+    const timeout = (args.timeout as number) || 10000
+    try {
+      const page = await ensureBrowser()
+      // text= 前缀转为 Playwright 的文本选择器
+      const loc = selector.startsWith('text=')
+        ? page.getByText(selector.slice(5), { exact: false }).first()
+        : page.locator(selector).first()
+      await loc.click({ timeout })
+      return `Clicked: ${selector}`
+    } catch (err) {
+      return `Error clicking "${selector}": ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 输入文本 ----
+export const browserTypeTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_type',
+      description: '在指定输入框中输入文本。会先清空已有内容。',
+      parameters: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS 选择器定位输入框' },
+          text: { type: 'string', description: '要输入的文本' },
+          press_enter: { type: 'boolean', description: '输入完成后是否按回车键，默认 false' }
+        },
+        required: ['selector', 'text']
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args) {
+    const selector = args.selector as string
+    const text = args.text as string
+    const pressEnter = args.press_enter as boolean
+    try {
+      const page = await ensureBrowser()
+      await page.locator(selector).first().fill(text, { timeout: 10000 })
+      if (pressEnter) await page.keyboard.press('Enter')
+      return `Typed "${text}" into ${selector}${pressEnter ? ' + Enter' : ''}`
+    } catch (err) {
+      return `Error typing into "${selector}": ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 截图 ----
+export const browserScreenshotTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_screenshot',
+      description: '截取当前页面截图，保存为 PNG 文件到指定路径。返回文件路径。',
+      parameters: {
+        type: 'object',
+        properties: {
+          file_path: { type: 'string', description: '截图保存路径（.png）。不填则保存到工作目录下 screenshot-{timestamp}.png' },
+          full_page: { type: 'boolean', description: '是否截取完整页面（包括滚动区域），默认 false' }
+        }
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args, ctx) {
+    const fullPage = args.full_page as boolean
+    const path = require('node:path') as typeof import('node:path')
+    const fs = require('node:fs') as typeof import('node:fs')
+    const filePath = (args.file_path as string) || path.join(ctx.workspacePath, `screenshot-${Date.now()}.png`)
+    try {
+      const page = await ensureBrowser()
+      await page.screenshot({ path: filePath, fullPage, type: 'png' })
+      const size = fs.statSync(filePath).size
+      return `Screenshot saved: ${filePath} (${(size / 1024).toFixed(1)} KB, ${fullPage ? 'full page' : 'viewport'})`
+    } catch (err) {
+      return `Error taking screenshot: ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 获取页面文本 ----
+export const browserGetTextTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_get_text',
+      description: '提取页面可见文本内容。可指定 CSS 选择器提取局部文本，不指定则提取整个页面。',
+      parameters: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS 选择器，不填则获取整个页面 body 文本' },
+          max_length: { type: 'number', description: '返回文本的最大字符数，默认 5000' }
+        }
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args) {
+    const selector = args.selector as string
+    const maxLength = (args.max_length as number) || 5000
+    try {
+      const page = await ensureBrowser()
+      let text: string
+      if (selector) {
+        text = await page.locator(selector).first().innerText({ timeout: 10000 })
+      } else {
+        text = await page.locator('body').innerText()
+      }
+      if (text.length > maxLength) text = text.slice(0, maxLength) + '\n... (truncated)'
+      return text || '(no text found)'
+    } catch (err) {
+      return `Error getting text: ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 等待 ----
+export const browserWaitTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_wait',
+      description: '等待页面上的元素出现、消失，或等待固定时间。',
+      parameters: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', description: '等待类型: selector (等元素出现) | selector_gone (等元素消失) | timeout (固定等待)', enum: ['selector', 'selector_gone', 'timeout'] },
+          selector: { type: 'string', description: 'CSS 选择器 (type=selector/selector_gone 时必填)' },
+          timeout: { type: 'number', description: '超时毫秒数 (type=timeout 时为等待毫秒数，默认 3000)' }
+        },
+        required: ['type']
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args) {
+    const type = args.type as string
+    const selector = args.selector as string
+    const timeout = (args.timeout as number) || 3000
+    try {
+      const page = await ensureBrowser()
+      if (type === 'timeout') {
+        await page.waitForTimeout(timeout)
+        return `Waited ${timeout}ms`
+      } else if (type === 'selector') {
+        await page.locator(selector).first().waitFor({ state: 'visible', timeout })
+        return `Element "${selector}" appeared`
+      } else if (type === 'selector_gone') {
+        await page.locator(selector).first().waitFor({ state: 'hidden', timeout })
+        return `Element "${selector}" disappeared`
+      }
+      return 'Error: invalid wait type'
+    } catch (err) {
+      return `Error waiting: ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 获取页面 HTML ----
+export const browserGetHtmlTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_get_html',
+      description: '获取页面指定元素的 outerHTML。不指定选择器则获取整个页面 HTML。',
+      parameters: {
+        type: 'object',
+        properties: {
+          selector: { type: 'string', description: 'CSS 选择器，不填则获取 body HTML' },
+          max_length: { type: 'number', description: '返回 HTML 的最大字符数，默认 5000' }
+        }
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute(args) {
+    const selector = args.selector as string
+    const maxLength = (args.max_length as number) || 5000
+    try {
+      const page = await ensureBrowser()
+      const html = await page.locator(selector || 'body').first().innerHTML()
+      let result = html || '(no html)'
+      if (result.length > maxLength) result = result.slice(0, maxLength) + '\n... (truncated)'
+      return result
+    } catch (err) {
+      return `Error getting HTML: ${(err as Error).message}`
+    }
+  }
+}
+
+// ---- 关闭浏览器 ----
+export const browserCloseTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'browser_close',
+      description: '关闭浏览器实例，释放资源。在完成所有浏览器操作后应该调用。',
+      parameters: {
+        type: 'object',
+        properties: {}
+      }
+    }
+  },
+  permission: 'safe' as const,
+  async execute() {
+    try {
+      if (browser) {
+        await browser.close()
+        browser = null
+        context = null
+        activePage = null
+        log('info', '[Playwright] Browser closed')
+        return 'Browser closed'
+      }
+      return 'Browser was not open'
+    } catch (err) {
+      return `Error closing browser: ${(err as Error).message}`
+    }
+  }
+}
+
+// 导出所有浏览器工具
+export const browserTools: { name: string; handler: ToolHandler }[] = [
+  { name: 'browser_navigate', handler: browserNavigateTool },
+  { name: 'browser_click', handler: browserClickTool },
+  { name: 'browser_type', handler: browserTypeTool },
+  { name: 'browser_screenshot', handler: browserScreenshotTool },
+  { name: 'browser_get_text', handler: browserGetTextTool },
+  { name: 'browser_get_html', handler: browserGetHtmlTool },
+  { name: 'browser_wait', handler: browserWaitTool },
+  { name: 'browser_close', handler: browserCloseTool }
+]

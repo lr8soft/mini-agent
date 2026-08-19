@@ -6,6 +6,8 @@ import * as path from 'node:path'
 import { exec } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import type { ToolHandler, ToolContext } from './registry'
+import { updateSessionTitle } from '../store/db'
+import { mainWindow } from '../index'
 
 // 文本读取工具
 export const readTool: ToolHandler = {
@@ -25,6 +27,7 @@ export const readTool: ToolHandler = {
       }
     }
   },
+  permission: 'safe',
   async execute(args, ctx: ToolContext) {
     const filePath = args.file_path as string
     const offset = (args.offset as number) || 1
@@ -63,6 +66,7 @@ export const writeTool: ToolHandler = {
       }
     }
   },
+  permission: 'normal',
   async execute(args, ctx) {
     const filePath = args.file_path as string
     const content = args.content as string
@@ -97,6 +101,7 @@ export const editTool: ToolHandler = {
       }
     }
   },
+  permission: 'normal',
   async execute(args, ctx) {
     const filePath = args.file_path as string
     const oldStr = args.oldString as string
@@ -138,6 +143,7 @@ export const bashTool: ToolHandler = {
       }
     }
   },
+  permission: 'dangerous',
   async execute(args, ctx) {
     const command = args.command as string
     const timeout = ((args.timeout as number) || 120) * 1000
@@ -179,6 +185,7 @@ export const grepTool: ToolHandler = {
       }
     }
   },
+  permission: 'safe',
   async execute(args, ctx) {
     const pattern = args.pattern as string
     const searchPath = args.path as string || ctx.workspacePath
@@ -243,6 +250,7 @@ export const globTool: ToolHandler = {
       }
     }
   },
+  permission: 'safe',
   async execute(args, ctx) {
     const pattern = args.pattern as string
     const searchPath = args.path as string || ctx.workspacePath
@@ -275,6 +283,7 @@ export const lsTool: ToolHandler = {
       }
     }
   },
+  permission: 'safe',
   async execute(args, ctx) {
     const target = args.path as string || ctx.workspacePath
     const ignore = (args.ignore as string[]) || ['node_modules', '.git']
@@ -320,6 +329,35 @@ async function walkDir(dir: string, pattern: string, results: string[], workspac
   }
 }
 
+// 设置会话标题工具
+export const setTitleTool: ToolHandler = {
+  definition: {
+    type: 'function',
+    function: {
+      name: 'set_title',
+      description: '为当前对话设置一个简短的标题（最多6个词）。在对话开始时应该尽早调用此工具来为会话命名。',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: '简洁的对话标题，不超过6个词' }
+        },
+        required: ['title']
+      }
+    }
+  },
+  permission: 'safe',
+  async execute(args, ctx: ToolContext) {
+    const title = (args.title as string || '').trim().slice(0, 50)
+    if (!title) return 'Error: title is required'
+    const sid = ctx.sessionId
+    if (sid) {
+      updateSessionTitle(sid, title)
+      mainWindow?.webContents.send('session:title_updated', { sessionId: sid, title })
+      return `Session title set to: ${title}`
+    }
+    return `Title suggestion: ${title} (no active session context)`
+  }
+}
 // 导出所有内置工具
 export const builtinTools: { name: string; handler: ToolHandler }[] = [
   { name: 'read', handler: readTool },
@@ -328,5 +366,6 @@ export const builtinTools: { name: string; handler: ToolHandler }[] = [
   { name: 'bash', handler: bashTool },
   { name: 'grep', handler: grepTool },
   { name: 'glob', handler: globTool },
-  { name: 'ls', handler: lsTool }
+  { name: 'ls', handler: lsTool },
+  { name: 'set_title', handler: setTitleTool }
 ]

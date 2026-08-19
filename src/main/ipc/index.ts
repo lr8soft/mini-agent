@@ -3,12 +3,14 @@
 // 所有来自渲染进程的请求在这里注册
 // ============================================================
 import { ipcMain, BrowserWindow, dialog } from 'electron'
-import type { AppSettings, ChatMessage, ProviderConfig } from '../../shared/types'
+import type { AppSettings, ChatMessage } from '../../shared/types'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter, type AgentEventCallbacks } from '../agent/runner'
-import { complete } from '../llm/provider'
+import { log } from '../llm/provider'
 import { registerTool, clearTools } from '../tools/registry'
 import { builtinTools } from '../tools/builtin'
+import { browserTools } from '../tools/browser'
+import { getToolPermission, type PermissionLevel } from '../tools/registry'
 import { reconnectAllMcpServers, connectMcpServer, disconnectMcpServer } from '../mcp/client'
 import { reloadSkills, getSkillsSystemPrompt } from '../skill/manager'
 
@@ -26,6 +28,10 @@ export function setupIpc(win: BrowserWindow): void {
   // 注册内置工具
   clearTools()
   for (const { name, handler } of builtinTools) {
+    registerTool(name, handler, 'builtin')
+  }
+  // 注册浏览器工具
+  for (const { name, handler } of browserTools) {
     registerTool(name, handler, 'builtin')
   }
 
@@ -65,6 +71,7 @@ export function setupIpc(win: BrowserWindow): void {
   // Agent 对话
   // ============================================================
   ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: string, options?: { modelOverride?: string; autoApprove?: boolean }) => {
+    log('info', `agent:run — sessionId=${sessionId}, autoApprove=${options?.autoApprove}, modelOverride=${options?.modelOverride || '(default)'}`)
     const settings = db.getSettings()
     const provider = settings.providers.find(p => p.id === settings.activeProviderId)
     if (!provider) {
@@ -143,11 +150,6 @@ export function setupIpc(win: BrowserWindow): void {
         db.updateMessageContent(assistantMsgId, assistantMsg.content, 'done')
         e.sender.send('agent:complete', { sessionId, messageId: assistantMsgId, content: assistantMsg.content })
         abortControllers.delete(sessionId)
-
-        // 异步生成标题（仅第一次对话）
-        if (history.length <= 1) {
-          generateTitle(sessionId, userMessage, provider).catch(() => {})
-        }
       },
       onError: (error) => {
         db.updateMessageContent(assistantMsgId, assistantMsg.content || `Error: ${error.message}`, 'error')
@@ -156,12 +158,27 @@ export function setupIpc(win: BrowserWindow): void {
       }
     }
 
-    // 权限检查回调 — 转发给前端
+    // 权限检查回调 — 统一决策：根据工具权限等级 + autoApprove 决定是否弹窗
+    // autoApprove=true: 所有工具自动放行（safe/normal/dangerous 全部跳过弹窗）
+    // autoApprove=false:
+    //   safe:      永远自动放行
+    //   normal:    弹窗确认
+    //   dangerous: 弹窗确认
     const permissionCheck = async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
-      // 对无副作用的工具自动放行
-      const safeTools = ['read', 'grep', 'glob', 'ls']
-      if (safeTools.includes(toolName)) return true
+      const level: PermissionLevel = getToolPermission(toolName)
+      const autoApprove = options?.autoApprove === true
 
+      // safe 工具永远放行
+      if (level === 'safe') {
+        return true
+      }
+
+      // autoApprove 开启时，所有工具（包括 dangerous）自动放行
+      if (autoApprove) {
+        return true
+      }
+
+      // normal 或 dangerous，且未开启 autoApprove → 弹窗确认
       const permId = genId()
       return new Promise<boolean>((resolve) => {
         pendingPermissions.set(permId, { resolve })
@@ -177,10 +194,10 @@ export function setupIpc(win: BrowserWindow): void {
           messages: chatMessages,
           provider,
           workspacePath: settings.workspacePath,
+          sessionId,
           permissionCheck,
           signal: abortController.signal,
-          modelOverride: options?.modelOverride,
-          autoApprove: options?.autoApprove
+          modelOverride: options?.modelOverride
         },
         callbacks
       )
@@ -265,27 +282,6 @@ export function setupIpc(win: BrowserWindow): void {
     await disconnectMcpServer(id)
     return true
   })
-}
-
-async function generateTitle(sessionId: string, userMessage: string, provider: ProviderConfig): Promise<void> {
-  try {
-    const title = await complete(
-      provider,
-      [
-        { role: 'system', content: 'Generate a very short title (max 6 words) for this conversation. Reply with ONLY the title, no quotes or punctuation.' },
-        { role: 'user', content: userMessage }
-      ],
-      undefined,
-      30
-    )
-    const cleanTitle = title.trim().replace(/^["']|["']$/g, '').slice(0, 50)
-    if (cleanTitle) {
-      db.updateSessionTitle(sessionId, cleanTitle)
-      mainWindow?.webContents.send('session:title_updated', { sessionId, title: cleanTitle })
-    }
-  } catch {
-    // 标题生成失败不报错
-  }
 }
 
 function genId(): string {
