@@ -5,6 +5,7 @@
 import type { ChatMessage, ProviderConfig, ToolCall } from '../../shared/types'
 import { streamChat, log } from '../llm/provider'
 import { getTool, getAllTools, getToolPermission, type ToolContext } from '../tools/registry'
+import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 
 const MAX_TOOL_ROUNDS = 20      // 单次对话最大工具调用轮数，防止死循环
 
@@ -40,6 +41,8 @@ export interface AgentRunOptions {
   systemPromptExtra?: string
   /** 覆盖模型名（如果用户在聊天页选了别的模型） */
   modelOverride?: string
+  /** 是否启用长期记忆（提取 + 注入） */
+  memoryEnabled?: boolean
 }
 
 /**
@@ -49,11 +52,12 @@ export async function runAgent(
   opts: AgentRunOptions,
   cb: AgentEventCallbacks
 ): Promise<ChatMessage[]> {
-  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, sessionId } = opts
+  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, sessionId, memoryEnabled } = opts
 
-  // 构建系统提示词
+  // 构建系统提示词（含记忆注入）
   const skillsPrompt = skillsPromptGetter ? skillsPromptGetter() : ''
-  const systemPrompt = buildSystemPrompt(workspacePath, skillsPrompt, opts.systemPromptExtra)
+  const memoryPrompt = memoryEnabled ? buildMemoryPrompt(getLastUserMessage(messages)) : ''
+  const systemPrompt = buildSystemPrompt(workspacePath, skillsPrompt, memoryPrompt, opts.systemPromptExtra)
 
   // 工作消息列表（含 system）
   const workingMessages: ChatMessage[] = [
@@ -87,6 +91,10 @@ export async function runAgent(
     if (!toolCalls || toolCalls.length === 0) {
       log('info', `Agent completed after ${round} round(s)`)
       cb.onComplete?.()
+      // 异步提取记忆（不阻塞返回）
+      if (memoryEnabled && sessionId) {
+        captureMemories(provider, workingMessages, sessionId).catch(() => {})
+      }
       return allAssistantMessages
     }
 
@@ -171,15 +179,19 @@ export async function runAgent(
     // 继续下一轮，让 LLM 看到工具结果后决定下一步
   }
 
-  log('warn', `Agent reached max rounds (${MAX_TOOL_ROUNDS}), stopping`)
-  cb.onComplete?.()
+    log('warn', `Agent reached max rounds (${MAX_TOOL_ROUNDS}), stopping`)
+    cb.onComplete?.()
+  // 异步提取记忆（不阻塞返回）
+  if (memoryEnabled && sessionId) {
+    captureMemories(provider, workingMessages, sessionId).catch(() => {})
+  }
   return allAssistantMessages
 }
 
 /**
  * 构建系统提示词
  */
-function buildSystemPrompt(workspacePath: string, skillsPrompt: string, extra?: string): string {
+function buildSystemPrompt(workspacePath: string, skillsPrompt: string, memoryPrompt: string, extra?: string): string {
   let prompt = `You are MiniAgent, a powerful AI coding assistant operating in an Electron desktop environment.
 
 ## Environment
@@ -202,9 +214,23 @@ function buildSystemPrompt(workspacePath: string, skillsPrompt: string, extra?: 
     prompt += skillsPrompt
   }
 
+  if (memoryPrompt) {
+    prompt += memoryPrompt
+  }
+
   if (extra) {
     prompt += `\n\n${extra}`
   }
 
   return prompt
+}
+
+/** 从消息列表中获取最后一条 user 消息的 content */
+function getLastUserMessage(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user' && messages[i].content) {
+      return messages[i].content!
+    }
+  }
+  return ''
 }

@@ -14,6 +14,7 @@ A desktop AI coding agent platform built with Electron + React + TypeScript. Lik
 - **Model Switching** — Switch models on-the-fly from the chat bar without changing settings.
 - **Temperature & Reasoning Effort** — Per-provider temperature control and reasoning effort (low/medium/high) with toggle.
 - **Browser Automation** — Headless Chromium via Playwright: `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot`, `browser_get_text`, `browser_get_html`, `browser_wait`, `browser_close`.
+- **Long-term Memory** — Automatically extracts and stores user preferences, habits, and context from conversations via LLM. Injects relevant memories into system prompts for personalized responses.
 - **Dark Terminal Aesthetic** — OpenCode-inspired UI with monospace fonts and purple accent.
 
 ## Tech Stack
@@ -100,6 +101,16 @@ Open Settings (gear icon in sidebar) to configure:
 
 Pick any `.md` file with frontmatter + Markdown body. The content is injected into the agent's system prompt.
 
+### Memory (Long-term)
+
+Automatically captures user preferences, habits, working style, and project context from conversations.
+
+- **Categories**: preference, habit, fact, skill, context (each with 1-5 importance)
+- **Auto-extraction**: After each conversation, the LLM analyzes dialog and extracts memorable info
+- **Smart retrieval**: Relevant memories are injected into the system prompt based on keyword matching with the current user message
+- **Deduplication**: Similar memories are automatically skipped
+- **Manageable**: View, search, filter, delete, and adjust importance from Settings > Memory tab
+
 ### General
 
 - **Workspace Path**: Root directory for file operations. All file tools are relative to this path.
@@ -121,7 +132,13 @@ Pick any `.md` file with frontmatter + Markdown body. The content is injected in
 │  └───────────────────────────────────┘   │
 │  ┌───────────────────────────────────┐   │
 │  │         SQLite Store              │   │
-│  │  (sessions + messages + settings) │   │
+│  │  (sessions + messages + settings  │   │
+│  │   + memory_entries)               │   │
+│  └───────────────────────────────────┘   │
+│  ┌───────────────────────────────────┐   │
+│  │       Memory Manager              │   │
+│  │  (extractor + retrieval +        │   │
+│  │   prompt injection)               │   │
 │  └───────────────────────────────────┘   │
 │                 IPC Bridge               │
 ├─────────────────────────────────────────┤
@@ -130,7 +147,7 @@ Pick any `.md` file with frontmatter + Markdown body. The content is injected in
 │              React Renderer               │
 │  ┌────────┐ ┌──────────┐ ┌────────────┐  │
 │  │Sidebar │ │ChatView  │ │SettingsView│  │
-│  │(sessions)│(messages)│ │(4 tabs)   │  │
+│  │(sessions)│(messages)│ │(5 tabs)   │  │
 │  └────────┘ └──────────┘ └────────────┘  │
 │  ┌──────────────────────────────────┐    │
 │  │     Zustand Store (global state)  │    │
@@ -157,6 +174,42 @@ User Input
 ```
 
 Max 20 rounds per conversation to prevent infinite loops.
+
+### Memory Flow (Long-term)
+
+```
+User Message
+    │
+    ▼
+┌──────────────────┐    ┌──────────────────┐
+│ Retrieve relevant│    │ Memory DB       │
+│ memories (keyword│◄───│ (SQLite)         │
+│ + importance)    │    │ - preference     │
+└────────┬─────────┘    │ - habit          │
+         │              │ - fact           │
+         ▼              │ - skill          │
+┌──────────────────┐    │ - context        │
+│ Inject into      │    └──────────────────┘
+│ System Prompt    │
+└────────┬─────────┘
+         │
+         ▼
+    ┌─────────┐
+    │   LLM   │
+    │ (stream)│
+    └────┬────┘
+         │ after completion
+         ▼
+┌──────────────────┐
+│ Extract Memories │
+│ (LLM analysis)   │
+└────────┬─────────┘
+         │ deduplicate
+         ▼
+┌──────────────────┐
+│ Store to DB      │
+└──────────────────┘
+```
 
 ## Keyboard Shortcuts
 

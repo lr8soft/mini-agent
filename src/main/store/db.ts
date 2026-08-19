@@ -4,7 +4,7 @@
 import Database from 'better-sqlite3'
 import * as path from 'node:path'
 import { app } from 'electron'
-import type { Session, UIMessage, AppSettings } from '../../shared/types'
+import type { Session, UIMessage, AppSettings, MemoryEntry, MemoryCategory } from '../../shared/types'
 
 let db: Database.Database | null = null
 
@@ -41,6 +41,21 @@ export function initDatabase(): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS memory_entries (
+      id TEXT PRIMARY KEY,
+      category TEXT NOT NULL,
+      content TEXT NOT NULL,
+      importance INTEGER NOT NULL DEFAULT 3,
+      source_session_id TEXT,
+      created_at INTEGER NOT NULL,
+      last_accessed INTEGER NOT NULL,
+      access_count INTEGER NOT NULL DEFAULT 0,
+      tags TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_memory_category ON memory_entries(category);
+    CREATE INDEX IF NOT EXISTS idx_memory_importance ON memory_entries(importance DESC);
   `)
 }
 
@@ -159,14 +174,91 @@ export function saveSettings(settings: AppSettings): void {
 
 function defaultSettings(): AppSettings {
   return {
-    providers: [],
+    providers: [
+      {
+        id: 'zhuminet-default',
+        name: '煮米 API',
+        baseUrl: 'https://api.zhuminet.com/v1',
+        apiKey: '',
+        defaultModel: 'gpt-4o',
+        enabled: true
+      }
+    ],
     mcpServers: [],
     skills: [],
-    activeProviderId: null,
-    workspacePath: app.getPath('home')
+    activeProviderId: 'zhuminet-default',
+    workspacePath: app.getPath('home'),
+    memoryEnabled: true
   }
 }
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+}
+
+// ============================================================
+// Memory 操作 — longterm-skill
+// ============================================================
+
+export function addMemory(entry: Omit<MemoryEntry, 'id' | 'createdAt' | 'lastAccessed' | 'accessCount'>): MemoryEntry {
+  const id = genId()
+  const now = Date.now()
+  db!.prepare(`
+    INSERT INTO memory_entries (id, category, content, importance, source_session_id, created_at, last_accessed, access_count, tags)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+  `).run(id, entry.category, entry.content, entry.importance, entry.sourceSessionId, now, now, JSON.stringify(entry.tags || []))
+  return { ...entry, id, createdAt: now, lastAccessed: now, accessCount: 0 }
+}
+
+export function getMemories(options?: { category?: MemoryCategory; limit?: number; search?: string }): MemoryEntry[] {
+  let sql = 'SELECT * FROM memory_entries'
+  const params: any[] = []
+  const conditions: string[] = []
+
+  if (options?.category) {
+    conditions.push('category = ?')
+    params.push(options.category)
+  }
+  if (options?.search) {
+    conditions.push('(content LIKE ? OR tags LIKE ?)')
+    params.push(`%${options.search}%`, `%${options.search}%`)
+  }
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ')
+  }
+  sql += ' ORDER BY importance DESC, last_accessed DESC'
+  if (options?.limit) {
+    sql += ' LIMIT ?'
+    params.push(options.limit)
+  }
+
+  const rows = db!.prepare(sql).all(...params) as any[]
+  return rows.map(r => ({
+    id: r.id,
+    category: r.category,
+    content: r.content,
+    importance: r.importance,
+    sourceSessionId: r.source_session_id,
+    createdAt: r.created_at,
+    lastAccessed: r.last_accessed,
+    accessCount: r.access_count,
+    tags: r.tags ? JSON.parse(r.tags) : []
+  }))
+}
+
+export function deleteMemory(id: string): void {
+  db!.prepare('DELETE FROM memory_entries WHERE id = ?').run(id)
+}
+
+export function clearAllMemories(): void {
+  db!.prepare('DELETE FROM memory_entries').run()
+}
+
+export function touchMemory(id: string): void {
+  db!.prepare('UPDATE memory_entries SET last_accessed = ?, access_count = access_count + 1 WHERE id = ?')
+    .run(Date.now(), id)
+}
+
+export function updateMemoryImportance(id: string, importance: number): void {
+  db!.prepare('UPDATE memory_entries SET importance = ? WHERE id = ?').run(importance, id)
 }

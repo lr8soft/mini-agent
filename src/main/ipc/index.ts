@@ -2,7 +2,7 @@
 // IPC 处理层 — 主进程侧
 // 所有来自渲染进程的请求在这里注册
 // ============================================================
-import { ipcMain, BrowserWindow, dialog } from 'electron'
+import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import type { AppSettings, ChatMessage } from '../../shared/types'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter, type AgentEventCallbacks } from '../agent/runner'
@@ -13,6 +13,7 @@ import { browserTools } from '../tools/browser'
 import { getToolPermission, type PermissionLevel } from '../tools/registry'
 import { reconnectAllMcpServers, connectMcpServer, disconnectMcpServer } from '../mcp/client'
 import { reloadSkills, getSkillsSystemPrompt } from '../skill/manager'
+import { getMemories, deleteMemory, clearAllMemories, updateMemoryImportance } from '../store/db'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -197,7 +198,8 @@ export function setupIpc(win: BrowserWindow): void {
           sessionId,
           permissionCheck,
           signal: abortController.signal,
-          modelOverride: options?.modelOverride
+          modelOverride: options?.modelOverride,
+          memoryEnabled: settings.memoryEnabled !== false
         },
         callbacks
       )
@@ -264,6 +266,37 @@ export function setupIpc(win: BrowserWindow): void {
       filters: [{ name: 'Skill files', extensions: ['md'] }]
     })
     return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('shell:openExternal', (_e, url: string) => {
+    shell.openExternal(url)
+    return true
+  })
+
+  // ============================================================
+  // Memory 管理 — longterm-skill
+  // ============================================================
+  ipcMain.handle('memory:list', (_e, options?: { category?: string; search?: string; limit?: number }) => {
+    return getMemories({
+      category: options?.category as any,
+      search: options?.search,
+      limit: options?.limit
+    })
+  })
+
+  ipcMain.handle('memory:delete', (_e, id: string) => {
+    deleteMemory(id)
+    return true
+  })
+
+  ipcMain.handle('memory:clearAll', () => {
+    clearAllMemories()
+    return true
+  })
+
+  ipcMain.handle('memory:updateImportance', (_e, id: string, importance: number) => {
+    updateMemoryImportance(id, importance)
+    return true
   })
 
   // ============================================================

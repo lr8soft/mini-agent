@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '../store'
-import type { ProviderConfig, McpServerConfig, SkillConfig } from '@shared/types'
+import type { ProviderConfig, McpServerConfig, SkillConfig, MemoryEntry, MemoryCategory } from '@shared/types'
 
 export default function SettingsView() {
   const { settings, saveSettings } = useAppStore()
   const [local, setLocal] = useState({ ...settings })
-  const [tab, setTab] = useState<'providers' | 'mcp' | 'skills' | 'general'>('providers')
+  const [tab, setTab] = useState<'providers' | 'mcp' | 'skills' | 'memory' | 'general'>('providers')
 
   const handleSave = () => {
     saveSettings(local)
@@ -18,7 +18,7 @@ export default function SettingsView() {
 
         {/* Tab 切换 */}
         <div className="flex gap-1 mb-6 bg-bg-card rounded-lg p-1">
-          {(['providers', 'mcp', 'skills', 'general'] as const).map(t => (
+          {(['providers', 'mcp', 'skills', 'memory', 'general'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -28,7 +28,7 @@ export default function SettingsView() {
                   : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
               }`}
             >
-              {t === 'providers' ? 'LLM Providers' : t === 'mcp' ? 'MCP Servers' : t === 'skills' ? 'Skills' : 'General'}
+              {t === 'providers' ? 'LLM Providers' : t === 'mcp' ? 'MCP Servers' : t === 'skills' ? 'Skills' : t === 'memory' ? 'Memory' : 'General'}
             </button>
           ))}
         </div>
@@ -56,6 +56,11 @@ export default function SettingsView() {
             skills={local.skills}
             onChange={(skills) => setLocal({ ...local, skills })}
           />
+        )}
+
+        {/* Memory */}
+        {tab === 'memory' && (
+          <MemorySettings />
         )}
 
         {/* General */}
@@ -118,6 +123,19 @@ function ProviderSettings({ providers, activeId, onChange }: {
       <p className="text-xs text-text-muted mb-4">
         Configure LLM providers. Any OpenAI-compatible endpoint works (Ollama, vLLM, OpenAI, Anthropic, etc.).
       </p>
+
+      {/* 煮米 API 引流 */}
+      <div className="flex items-center justify-between bg-bg-card border border-accent/30 rounded-lg px-4 py-3 mb-4">
+        <div className="text-xs text-text-secondary">
+          <span className="text-accent-glow font-medium">煮米 API</span> — 一站式 AI 模型 API 服务，注册即送免费额度
+        </div>
+        <button
+          onClick={() => window.api.settings.openExternal('https://api.zhuminet.com/')}
+          className="text-xs text-accent hover:text-accent-glow underline shrink-0"
+        >
+          前往注册 →
+        </button>
+      </div>
 
       {providers.map((p, i) => (
         <div key={p.id} className={`bg-bg-card border rounded-lg p-4 mb-3 ${activeId === p.id ? 'border-accent' : 'border-border'}`}>
@@ -440,6 +458,147 @@ function GeneralSettings({ workspacePath, onChange }: {
       <p className="text-xs text-text-muted mt-2">
         The root directory the agent will work in. File tools are relative to this path.
       </p>
+    </div>
+  )
+}
+
+// ============================================================
+// Memory Settings — longterm-skill
+// ============================================================
+function MemorySettings() {
+  const [memories, setMemories] = useState<MemoryEntry[]>([])
+  const [search, setSearch] = useState('')
+  const [filterCategory, setFilterCategory] = useState<string>('')
+
+  const loadMemories = async () => {
+    const result = await window.api.memory.list({
+      search: search || undefined,
+      category: filterCategory || undefined,
+      limit: 200
+    })
+    setMemories(result as MemoryEntry[])
+  }
+
+  useEffect(() => {
+    loadMemories()
+  }, [search, filterCategory])
+
+  const handleDelete = async (id: string) => {
+    await window.api.memory.delete(id)
+    loadMemories()
+  }
+
+  const handleClearAll = async () => {
+    await window.api.memory.clearAll()
+    loadMemories()
+  }
+
+  const handleImportance = async (id: string, importance: number) => {
+    await window.api.memory.updateImportance(id, importance)
+    loadMemories()
+  }
+
+  const categoryLabels: Record<string, string> = {
+    preference: 'Preference',
+    habit: 'Habit',
+    fact: 'Fact',
+    skill: 'Skill',
+    context: 'Context'
+  }
+
+  const categoryColors: Record<string, string> = {
+    preference: 'text-blue-400',
+    habit: 'text-green-400',
+    fact: 'text-yellow-400',
+    skill: 'text-purple-400',
+    context: 'text-cyan-400'
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-text-muted">
+          Long-term memory entries automatically captured from conversations. The agent uses these to personalize responses.
+        </p>
+        {memories.length > 0 && (
+          <button onClick={handleClearAll} className="text-xs text-err hover:underline shrink-0 ml-4">
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* 搜索与筛选 */}
+      <div className="flex gap-2 mb-4">
+        <input
+          className="input-field flex-1 text-sm"
+          placeholder="Search memories..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          className="input-field text-sm"
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+        >
+          <option value="">All Categories</option>
+          <option value="preference">Preference</option>
+          <option value="habit">Habit</option>
+          <option value="fact">Fact</option>
+          <option value="skill">Skill</option>
+          <option value="context">Context</option>
+        </select>
+      </div>
+
+      {/* 记忆列表 */}
+      {memories.length === 0 ? (
+        <div className="text-center py-12 text-text-muted text-sm">
+          {search || filterCategory ? 'No memories match your filter.' : 'No memories yet. They will be automatically captured as you chat with the agent.'}
+        </div>
+      ) : (
+        memories.map((mem) => (
+          <div key={mem.id} className="bg-bg-card border border-border rounded-lg p-3 mb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs font-medium ${categoryColors[mem.category] || 'text-text-secondary'}`}>
+                    {categoryLabels[mem.category] || mem.category}
+                  </span>
+                  {/* Importance 星级 */}
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => handleImportance(mem.id, n)}
+                        className={`text-xs ${n <= mem.importance ? 'text-accent-glow' : 'text-text-muted'}`}
+                        title={`Set importance to ${n}`}
+                      >
+                        *
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-sm text-text-primary break-words">{mem.content}</p>
+                {mem.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {mem.tags.map(tag => (
+                      <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-bg-hover text-text-muted">{tag}</span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-text-muted mt-1">
+                  Accessed {mem.accessCount}x | {new Date(mem.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => handleDelete(mem.id)}
+                className="text-xs text-err hover:underline shrink-0"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   )
 }

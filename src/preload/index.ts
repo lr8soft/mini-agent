@@ -82,7 +82,9 @@ const api = {
     pickDirectory: (): Promise<string | null> =>
       ipcRenderer.invoke('settings:pickDirectory'),
     pickFile: (): Promise<string | null> =>
-      ipcRenderer.invoke('settings:pickFile')
+      ipcRenderer.invoke('settings:pickFile'),
+    openExternal: (url: string): Promise<boolean> =>
+      ipcRenderer.invoke('shell:openExternal', url)
   },
 
   // ============================================================
@@ -93,6 +95,20 @@ const api = {
       ipcRenderer.invoke('mcp:connect', config),
     disconnect: (id: string): Promise<boolean> =>
       ipcRenderer.invoke('mcp:disconnect', id)
+  },
+
+  // ============================================================
+  // Memory — longterm-skill
+  // ============================================================
+  memory: {
+    list: (options?: { category?: string; search?: string; limit?: number }): Promise<any[]> =>
+      ipcRenderer.invoke('memory:list', options),
+    delete: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke('memory:delete', id),
+    clearAll: (): Promise<boolean> =>
+      ipcRenderer.invoke('memory:clearAll'),
+    updateImportance: (id: string, importance: number): Promise<boolean> =>
+      ipcRenderer.invoke('memory:updateImportance', id, importance)
   },
 
   // ============================================================

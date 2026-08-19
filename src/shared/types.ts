@@ -102,4 +102,26 @@ export interface AppSettings {
   skills: SkillConfig[]
   activeProviderId: string | null
   workspacePath: string
+  /** 长期记忆功能开关 */
+  memoryEnabled?: boolean
+}
+
+// ============================================================
+// 长期记忆 — longterm-skill
+// ============================================================
+
+/** 记忆类别 */
+export type MemoryCategory = 'preference' | 'habit' | 'fact' | 'skill' | 'context'
+
+/** 记忆条目 */
+export interface MemoryEntry {
+  id: string
+  category: MemoryCategory
+  content: string
+  importance: number               // 1-5，5 最重要
+  sourceSessionId: string | null   // 来源会话
+  createdAt: number
+  lastAccessed: number
+  accessCount: number
+  tags: string[]                    // 关键词标签，用于检索
 }
