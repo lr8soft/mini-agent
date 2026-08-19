@@ -33,9 +33,9 @@ interface AppState {
   isRunning: boolean
   streamingMessageId: string | null
 
-  // 模型选择
-  selectedModel: string | null       // 覆盖 provider 默认模型，null 则用默认
-  setSelectedModel: (m: string | null) => void
+  // 模型选择 — 格式为 "providerId::modelName"，null 则用 active provider 默认模型
+  selectedProviderModel: string | null
+  setSelectedProviderModel: (v: string | null) => void
 
   // 自动批准
   autoApprove: boolean
@@ -103,8 +103,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   streamingMessageId: null,
 
   // ---- 模型选择 ----
-  selectedModel: null,
-  setSelectedModel: (m) => set({ selectedModel: m }),
+  selectedProviderModel: null,
+  setSelectedProviderModel: (v) => set({ selectedProviderModel: v }),
 
   // ---- 自动批准 ----
   autoApprove: false,
@@ -133,8 +133,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
 
     try {
+      // 解析 selectedProviderModel — 格式 "providerId::modelName"
+      const spm = get().selectedProviderModel
+      let providerId: string | undefined
+      let modelOverride: string | undefined
+      if (spm) {
+        const sepIdx = spm.indexOf('::')
+        if (sepIdx > 0) {
+          providerId = spm.slice(0, sepIdx)
+          modelOverride = spm.slice(sepIdx + 2) || undefined
+        }
+      }
+
       const result = await api.agent.run(activeSessionId, text, {
-        modelOverride: get().selectedModel || undefined,
+        providerId,
+        modelOverride,
         autoApprove: get().autoApprove
       })
       if (result.error) {

@@ -5,7 +5,7 @@ import MessageBubble from './MessageBubble'
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedModel, setSelectedModel, autoApprove, setAutoApprove } = useAppStore()
+  const { messages, isRunning, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, autoApprove, setAutoApprove } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -120,11 +120,11 @@ export default function ChatView() {
             rows={1}
             disabled={isRunning}
           />
-          {/* 模型选择下拉框 */}
+          {/* Provider/模型选择下拉框 */}
           <select
             className="input-field h-[42px] text-sm min-w-[140px]"
-            value={selectedModel || ''}
-            onChange={(e) => setSelectedModel(e.target.value || null)}
+            value={selectedProviderModel || ''}
+            onChange={(e) => setSelectedProviderModel(e.target.value || null)}
             title={t('chat.selectModelHint')}
           >
             <option value="">{t('chat.defaultModel')}</option>
@@ -132,9 +132,7 @@ export default function ChatView() {
               .filter(p => p.enabled)
               .map(p => (
                 <optgroup key={p.id} label={p.name}>
-                  {/* 默认模型 */}
-                  <option value={p.defaultModel}>{p.defaultModel} {t('chat.modelDefaultSuffix')}</option>
-                  {/* 如果有其他模型可以在这里加 */}
+                  <option value={`${p.id}::${p.defaultModel}`}>{p.defaultModel} {t('chat.modelDefaultSuffix')}</option>
                 </optgroup>
               ))}
           </select>

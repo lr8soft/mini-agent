@@ -81,10 +81,12 @@ export function setupIpc(win: BrowserWindow): void {
   // ============================================================
   // Agent 对话
   // ============================================================
-  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: string, options?: { modelOverride?: string; autoApprove?: boolean }) => {
-    log('info', `agent:run — sessionId=${sessionId}, autoApprove=${options?.autoApprove}, modelOverride=${options?.modelOverride || '(default)'}`)
+  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: string, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }) => {
+    log('info', `agent:run — sessionId=${sessionId}, autoApprove=${options?.autoApprove}, providerId=${options?.providerId || '(active)'}, modelOverride=${options?.modelOverride || '(default)'}`)
     const settings = db.getSettings()
-    const provider = settings.providers.find(p => p.id === settings.activeProviderId)
+    // 优先用 options.providerId（聊天页下拉框选择），否则用 settings.activeProviderId
+    const providerId = options?.providerId || settings.activeProviderId
+    const provider = settings.providers.find(p => p.id === providerId)
     if (!provider) {
       return { error: 'No active provider. Please configure one in Settings.' }
     }
