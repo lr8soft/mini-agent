@@ -10,7 +10,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "build:win": "electron-vite build && electron-builder --win --x64"
+    "build:win": "electron-vite build && electron-builder --win --x64",
+    "postinstall": "npx --yes cross-env PLAYWRIGHT_BROWSERS_PATH=node_modules/playwright-core/.local-browsers npx playwright install chromium"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -51,7 +52,32 @@
       "output": "release"
     },
     "files": [
-      "out/**/*"
+      "out/**/*",
+      "node_modules/playwright/**/*",
+      "node_modules/playwright-core/**/*",
+      "node_modules/@modelcontextprotocol/**/*",
+      "node_modules/gray-matter/**/*",
+      "node_modules/zod/**/*",
+      "!node_modules/**/{README,readme,CHANGELOG,changelog,LICENSE,license,*.md,*.map,*.ts}/**",
+      "!node_modules/playwright-core/lib/opus/**",
+      "!node_modules/playwright-core/lib/ffmpeg/**",
+      "!node_modules/playwright-core/lib/transform/**",
+      "!node_modules/**/test/**",
+      "!node_modules/**/tests/**",
+      "!node_modules/**/__tests__/**"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/robotjs/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/playwright-core/.local-browsers",
+        "to": "browsers",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
       "target": [

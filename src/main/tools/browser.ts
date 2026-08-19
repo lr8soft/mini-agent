@@ -1,9 +1,12 @@
 // ============================================================
-// Playwright 浏览器工具集 — 基于 @playwright/test 的 Chromium
+// Playwright 浏览器工具集 — 基于 playwright 的 Chromium
 // 工具: browser_navigate / browser_click / browser_type /
 //       browser_screenshot / browser_get_text / browser_wait
 // ============================================================
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
+import { app } from 'electron'
+import * as path from 'node:path'
+import * as fs from 'node:fs'
 import type { ToolHandler, ToolContext } from './registry'
 import { log } from '../llm/provider'
 
@@ -12,10 +15,51 @@ let browser: Browser | null = null
 let context: BrowserContext | null = null
 let activePage: Page | null = null
 
+/**
+ * 解析 Chromium 可执行文件路径
+ * - dev 模式：由 Playwright 自动从系统缓存目录查找
+ * - 打包模式：从 extraResources/browsers/ 下查找
+ */
+function resolveChromiumPath(): string | undefined {
+  if (!app.isPackaged) {
+    // dev 模式：让 Playwright 自己找
+    return undefined
+  }
+
+  // 打包模式：在 extraResources/browsers/ 下查找 chromium-XXXX/chrome-win64/chrome.exe
+  const browsersDir = path.join(process.resourcesPath, 'browsers')
+  if (!fs.existsSync(browsersDir)) {
+    log('warn', `[Playwright] Browsers directory not found: ${browsersDir}`)
+    return undefined
+  }
+
+  // 查找 chromium-XXXX 目录
+  const entries = fs.readdirSync(browsersDir)
+  const chromiumDir = entries.find(e => e.startsWith('chromium-'))
+  if (!chromiumDir) {
+    log('warn', `[Playwright] No chromium directory found in: ${browsersDir}`)
+    return undefined
+  }
+
+  // Windows: chromium-XXXX/chrome-win64/chrome.exe
+  const exePath = path.join(browsersDir, chromiumDir, 'chrome-win64', 'chrome.exe')
+  if (fs.existsSync(exePath)) {
+    log('info', `[Playwright] Using bundled chromium: ${exePath}`)
+    return exePath
+  }
+
+  log('warn', `[Playwright] Chromium executable not found at: ${exePath}`)
+  return undefined
+}
+
 async function ensureBrowser(): Promise<Page> {
   if (!browser) {
     log('info', '[Playwright] Launching chromium...')
-    browser = await chromium.launch({ headless: true })
+    const executablePath = resolveChromiumPath()
+    browser = await chromium.launch({
+      headless: true,
+      ...(executablePath ? { executablePath } : {})
+    })
     context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       locale: 'en-US'
