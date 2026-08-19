@@ -64,7 +64,7 @@ export function setupIpc(win: BrowserWindow): void {
   // ============================================================
   // Agent 对话
   // ============================================================
-  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: string) => {
+  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: string, options?: { modelOverride?: string; autoApprove?: boolean }) => {
     const settings = db.getSettings()
     const provider = settings.providers.find(p => p.id === settings.activeProviderId)
     if (!provider) {
@@ -178,7 +178,9 @@ export function setupIpc(win: BrowserWindow): void {
           provider,
           workspacePath: settings.workspacePath,
           permissionCheck,
-          signal: abortController.signal
+          signal: abortController.signal,
+          modelOverride: options?.modelOverride,
+          autoApprove: options?.autoApprove
         },
         callbacks
       )

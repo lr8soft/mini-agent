@@ -17,6 +17,7 @@ export interface CompletionParams {
   tools?: ToolDefinition[]
   temperature?: number
   maxTokens?: number
+  reasoningEffort?: 'low' | 'medium' | 'high'
   signal?: AbortSignal
 }
 
@@ -32,13 +33,17 @@ export async function streamChat(
   const model = params.model || provider.defaultModel
   const body: Record<string, unknown> = {
     model,
-    messages: params.messages.map(m => ({
-      role: m.role,
-      content: m.content,
-      tool_calls: m.tool_calls,
-      tool_call_id: m.tool_call_id,
-      name: m.name
-    })),
+    messages: params.messages.map(m => {
+      const msg: Record<string, unknown> = {
+        role: m.role,
+        content: m.content ?? ''
+      }
+      // 只包含有值的字段，避免 llama.cpp 等严格后端因 null 报错
+      if (m.tool_calls && m.tool_calls.length > 0) msg.tool_calls = m.tool_calls
+      if (m.tool_call_id) msg.tool_call_id = m.tool_call_id
+      if (m.name) msg.name = m.name
+      return msg
+    }),
     stream: true
   }
   if (params.tools?.length) {
@@ -47,6 +52,8 @@ export async function streamChat(
   }
   if (params.temperature !== undefined) body.temperature = params.temperature
   if (params.maxTokens) body.max_tokens = params.maxTokens
+  // reasoning_effort（DeepSeek-R1 / OpenAI o-series 等）
+  if (params.reasoningEffort) body.reasoning_effort = params.reasoningEffort
 
   const url = `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`
   let fullText = ''
@@ -153,7 +160,16 @@ export async function complete(
     },
     body: JSON.stringify({
       model: model || provider.defaultModel,
-      messages,
+      messages: messages.map(m => {
+        const msg: Record<string, unknown> = {
+          role: m.role,
+          content: m.content ?? ''
+        }
+        if (m.tool_calls && m.tool_calls.length > 0) msg.tool_calls = m.tool_calls
+        if (m.tool_call_id) msg.tool_call_id = m.tool_call_id
+        if (m.name) msg.name = m.name
+        return msg
+      }),
       max_tokens: maxTokens,
       temperature: 0.3,
       stream: false

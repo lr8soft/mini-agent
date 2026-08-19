@@ -29,6 +29,9 @@ export interface ProviderConfig {
   apiKey: string
   defaultModel: string
   enabled: boolean
+  temperature?: number             // 采样温度，不设则由 API 默认
+  reasoningEnabled?: boolean       // 是否启用思考强度
+  reasoningEffort?: 'low' | 'medium' | 'high'  // 思考强度（reasoning_effort）
 }
 
 /** 单条渲染消息（UI 专用，含元数据） */

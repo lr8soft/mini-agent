@@ -37,6 +37,10 @@ export interface AgentRunOptions {
   permissionCheck?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
   signal?: AbortSignal
   systemPromptExtra?: string
+  /** 覆盖模型名（如果用户在聊天页选了别的模型） */
+  modelOverride?: string
+  /** 自动批准所有工具调用，跳过权限弹窗 */
+  autoApprove?: boolean
 }
 
 /**
@@ -46,7 +50,7 @@ export async function runAgent(
   opts: AgentRunOptions,
   cb: AgentEventCallbacks
 ): Promise<ChatMessage[]> {
-  const { provider, workspacePath, messages, signal, permissionCheck } = opts
+  const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, autoApprove } = opts
 
   // 构建系统提示词
   const skillsPrompt = skillsPromptGetter ? skillsPromptGetter() : ''
@@ -69,6 +73,9 @@ export async function runAgent(
     const { content, toolCalls } = await streamChat(provider, {
       messages: workingMessages,
       tools: tools.length > 0 ? tools : undefined,
+      model: modelOverride,
+      temperature: provider.temperature,
+      reasoningEffort: provider.reasoningEnabled ? provider.reasoningEffort : undefined,
       signal
     }, {
       onToken: cb.onToken,
@@ -116,8 +123,8 @@ export async function runAgent(
         }
 
         if (!isError) {
-          // 权限检查
-          if (permissionCheck) {
+          // 权限检查（autoApprove 模式跳过）
+          if (permissionCheck && !autoApprove) {
             const allowed = await permissionCheck(tc.function.name, parsedArgs)
             if (!allowed) {
               resultText = 'Permission denied by user'

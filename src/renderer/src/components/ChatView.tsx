@@ -3,7 +3,7 @@ import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
 
 export default function ChatView() {
-  const { messages, isRunning, sendMessage, abortAgent, activeSessionId, sessions } = useAppStore()
+  const { messages, isRunning, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedModel, setSelectedModel, autoApprove, setAutoApprove } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -67,13 +67,27 @@ export default function ChatView() {
             {sessions.find(s => s.id === activeSessionId)?.title || 'New Session'}
           </span>
         </div>
-        {isRunning && (
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span className="text-xs text-text-muted">Thinking...</span>
-            <button onClick={abortAgent} className="btn-danger text-xs">Stop</button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {/* 自动批准开关 */}
+          <button
+            onClick={() => setAutoApprove(!autoApprove)}
+            className={`text-xs px-2 py-1 rounded-md border transition-colors ${
+              autoApprove
+                ? 'bg-accent/20 border-accent text-accent-glow'
+                : 'border-border text-text-muted hover:text-text-primary'
+            }`}
+            title={autoApprove ? 'Auto-approve ON: all tool calls skip permission' : 'Auto-approve OFF: tools need permission'}
+          >
+            {autoApprove ? 'Auto-Approve: ON' : 'Auto-Approve: OFF'}
+          </button>
+          {isRunning && (
+            <>
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-xs text-text-muted">Thinking...</span>
+              <button onClick={abortAgent} className="btn-danger text-xs">Stop</button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* 消息流 */}
@@ -104,6 +118,24 @@ export default function ChatView() {
             rows={1}
             disabled={isRunning}
           />
+          {/* 模型选择下拉框 */}
+          <select
+            className="input-field h-[42px] text-sm min-w-[140px]"
+            value={selectedModel || ''}
+            onChange={(e) => setSelectedModel(e.target.value || null)}
+            title="Select model (empty = provider default)"
+          >
+            <option value="">(Default Model)</option>
+            {settings.providers
+              .filter(p => p.enabled)
+              .map(p => (
+                <optgroup key={p.id} label={p.name}>
+                  {/* 默认模型 */}
+                  <option value={p.defaultModel}>{p.defaultModel} (default)</option>
+                  {/* 如果有其他模型可以在这里加 */}
+                </optgroup>
+              ))}
+          </select>
           <button
             onClick={handleSubmit}
             disabled={!input.trim() || isRunning}

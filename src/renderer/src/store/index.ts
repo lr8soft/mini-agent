@@ -33,6 +33,14 @@ interface AppState {
   isRunning: boolean
   streamingMessageId: string | null
 
+  // 模型选择
+  selectedModel: string | null       // 覆盖 provider 默认模型，null 则用默认
+  setSelectedModel: (m: string | null) => void
+
+  // 自动批准
+  autoApprove: boolean
+  setAutoApprove: (v: boolean) => void
+
   // 权限
   permissionRequest: PermissionRequest | null
 
@@ -94,6 +102,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   isRunning: false,
   streamingMessageId: null,
 
+  // ---- 模型选择 ----
+  selectedModel: null,
+  setSelectedModel: (m) => set({ selectedModel: m }),
+
+  // ---- 自动批准 ----
+  autoApprove: false,
+  setAutoApprove: (v) => set({ autoApprove: v }),
+
   sendMessage: async (text: string) => {
     let { activeSessionId } = get()
     if (!activeSessionId) {
@@ -117,7 +133,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
 
     try {
-      const result = await api.agent.run(activeSessionId, text)
+      const result = await api.agent.run(activeSessionId, text, {
+        modelOverride: get().selectedModel || undefined,
+        autoApprove: get().autoApprove
+      })
       if (result.error) {
         set((s) => ({
           messages: [...s.messages, {

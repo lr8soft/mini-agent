@@ -29,8 +29,8 @@ const api = {
   // ============================================================
   agent: {
     /** 发送消息并启动 agent 运行 */
-    run: (sessionId: string, message: string): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
-      ipcRenderer.invoke('agent:run', sessionId, message),
+    run: (sessionId: string, message: string, options?: { modelOverride?: string; autoApprove?: boolean }): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
+      ipcRenderer.invoke('agent:run', sessionId, message, options),
     /** 中止当前运行 */
     abort: (sessionId: string): Promise<boolean> =>
       ipcRenderer.invoke('agent:abort', sessionId),

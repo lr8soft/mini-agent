@@ -91,7 +91,10 @@ function ProviderSettings({ providers, activeId, onChange }: {
       baseUrl: 'http://localhost:11434/v1',
       apiKey: '',
       defaultModel: 'qwen2.5:14b',
-      enabled: true
+      enabled: true,
+      temperature: undefined,
+      reasoningEnabled: false,
+      reasoningEffort: 'medium'
     }
     onChange([...providers, newProv], activeId || id)
   }
@@ -174,6 +177,56 @@ function ProviderSettings({ providers, activeId, onChange }: {
               </label>
             </div>
           </div>
+
+          {/* Temperature */}
+          <div className="mt-3">
+            <label className="text-xs text-text-muted block mb-1">
+              Temperature {p.temperature !== undefined && `(${p.temperature})`}
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={p.temperature ?? 1}
+                onChange={(e) => updateProvider(i, { temperature: parseFloat(e.target.value) })}
+                className="flex-1"
+              />
+              <button
+                onClick={() => updateProvider(i, { temperature: undefined })}
+                className="text-xs text-text-muted hover:text-text-primary"
+              >
+                Reset
+              </button>
+            </div>
+            <p className="text-xs text-text-muted mt-1">Leave at 1.0 for default. Lower = focused, higher = creative.</p>
+          </div>
+
+          {/* Reasoning Effort */}
+          <div className="mt-3 flex items-start gap-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer mt-1">
+              <input
+                type="checkbox"
+                checked={p.reasoningEnabled || false}
+                onChange={(e) => updateProvider(i, { reasoningEnabled: e.target.checked })}
+              />
+              <span className="text-text-secondary">Reasoning Effort</span>
+            </label>
+            {p.reasoningEnabled && (
+              <div className="flex-1">
+                <select
+                  className="input-field w-full text-sm"
+                  value={p.reasoningEffort || 'medium'}
+                  onChange={(e) => updateProvider(i, { reasoningEffort: e.target.value as 'low' | 'medium' | 'high' })}
+                >
+                  <option value="low">low — fast, less thinking</option>
+                  <option value="medium">medium — balanced</option>
+                  <option value="high">high — deep reasoning</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       ))}
 
@@ -245,15 +298,44 @@ function McpSettings({ servers, onChange }: {
               </select>
             </div>
             {s.type === 'stdio' ? (
-              <div className="col-span-2">
-                <label className="text-xs text-text-muted block mb-1">Command</label>
-                <input
-                  className="input-field w-full text-sm font-mono"
-                  value={s.command || ''}
-                  onChange={(e) => updateServer(i, { command: e.target.value })}
-                  placeholder="npx -y @modelcontextprotocol/server-filesystem /path"
-                />
-              </div>
+              <>
+                <div className="col-span-2">
+                  <label className="text-xs text-text-muted block mb-1">Command</label>
+                  <input
+                    className="input-field w-full text-sm font-mono"
+                    value={s.command || ''}
+                    onChange={(e) => updateServer(i, { command: e.target.value })}
+                    placeholder="npx"
+                  />
+                  <p className="text-xs text-text-muted mt-1">Executable only. Put flags/paths in Args below.</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-text-muted block mb-1">Args (space-separated)</label>
+                  <input
+                    className="input-field w-full text-sm font-mono"
+                    value={(s.args || []).join(' ')}
+                    onChange={(e) => updateServer(i, { args: e.target.value.split(/\s+/).filter(Boolean) })}
+                    placeholder="-y @playwright/mcp@latest"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-text-muted block mb-1">Env (KEY=VALUE, one per line)</label>
+                  <textarea
+                    className="input-field w-full text-sm font-mono"
+                    rows={2}
+                    value={Object.entries(s.env || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
+                    onChange={(e) => {
+                      const env: Record<string, string> = {}
+                      for (const line of e.target.value.split('\n')) {
+                        const eq = line.indexOf('=')
+                        if (eq > 0) env[line.slice(0, eq).trim()] = line.slice(eq + 1)
+                      }
+                      updateServer(i, { env })
+                    }}
+                    placeholder="API_KEY=xxx"
+                  />
+                </div>
+              </>
             ) : (
               <div className="col-span-2">
                 <label className="text-xs text-text-muted block mb-1">URL</label>

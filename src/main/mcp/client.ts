@@ -29,10 +29,29 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
   await disconnectMcpServer(config.id)
 
   try {
+    // ---- 解析 command/args ----
+    let cmd = config.command!
+    let cmdArgs = config.args || []
+
+    // 如果 command 含空格且没有单独的 args，自动拆分
+    if (!cmdArgs.length && cmd.includes(' ')) {
+      const parts = cmd.split(/\s+/)
+      cmd = parts[0]
+      cmdArgs = parts.slice(1)
+    }
+
+    // Windows: npx/npm 等 .cmd 脚本需要通过 cmd /c 调用
+    if (process.platform === 'win32') {
+      if (cmd === 'npx' || cmd === 'npm' || cmd === 'node' || cmd.endsWith('.cmd')) {
+        cmdArgs = ['/c', cmd, ...cmdArgs]
+        cmd = 'cmd'
+      }
+    }
+
     const transport = config.type === 'stdio'
       ? new StdioClientTransport({
-          command: config.command!,
-          args: config.args || [],
+          command: cmd,
+          args: cmdArgs,
           env: { ...process.env, ...(config.env || {}) } as Record<string, string>
         })
       : new SSEClientTransport(new URL(config.url!), {
