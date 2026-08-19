@@ -5,6 +5,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { McpServerConfig, ToolDefinition } from '../../shared/types'
 import { registerTool, unregisterToolsBySource, type ToolHandler, type ToolContext } from '../tools/registry'
 import { log } from '../llm/provider'
@@ -14,7 +15,68 @@ interface ActiveConnection {
   config: McpServerConfig
 }
 
+/** 单个 MCP 服务器的连接状态 */
+export type McpConnectionState = 'connecting' | 'connected' | 'failed'
+
+interface ServerState {
+  id: string
+  name: string
+  state: McpConnectionState
+  error?: string
+}
+
 const connections = new Map<string, ActiveConnection>()
+
+/** 所有已配置的 MCP 服务器状态（含连接中/已连接/失败） */
+const serverStates = new Map<string, ServerState>()
+
+/**
+ * 获取所有已配置 MCP 服务器的当前连接状态
+ * 供 runner 构建 system prompt 时使用：已连接的列工具，没连上的告诉 AI 不可用
+ */
+export function getMcpConnectionStatus(): { id: string; name: string; connected: boolean }[] {
+  return Array.from(serverStates.values()).map(s => ({
+    id: s.id,
+    name: s.name,
+    connected: s.state === 'connected'
+  }))
+}
+
+/**
+ * 根据 config 构建 SSE 请求 headers
+ * 合并自定义 headers + 认证 headers（认证优先级更高）
+ */
+function buildSseHeaders(config: McpServerConfig): Record<string, string> {
+  const headers: Record<string, string> = {}
+
+  // 1. 先合并用户自定义 headers
+  if (config.headers) {
+    Object.assign(headers, config.headers)
+  }
+
+  // 2. 根据认证类型添加认证 header（覆盖同名自定义 header）
+  switch (config.authType) {
+    case 'bearer':
+      if (config.authToken) {
+        headers['Authorization'] = `Bearer ${config.authToken}`
+      }
+      break
+    case 'apikey':
+      if (config.apiKey) {
+        const headerName = config.authHeader || 'X-API-Key'
+        headers[headerName] = config.apiKey
+      }
+      break
+    case 'custom':
+      // 用户通过 headers 字段自行配置，不做额外处理
+      break
+    case 'none':
+    default:
+      break
+  }
+
+  return headers
+}
 
 /**
  * 连接一个 MCP Server，注册其所有工具
@@ -27,6 +89,9 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
 
   // 如果已存在先断开
   await disconnectMcpServer(config.id)
+
+  // 标记为连接中
+  serverStates.set(config.id, { id: config.id, name: config.name, state: 'connecting' })
 
   try {
     // ---- 解析 command/args ----
@@ -54,9 +119,15 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
           args: cmdArgs,
           env: { ...process.env, ...(config.env || {}) } as Record<string, string>
         })
+      : config.type === 'streamable-http'
+      ? new StreamableHTTPClientTransport(new URL(config.url!), {
+          requestInit: {
+            headers: buildSseHeaders(config)
+          }
+        })
       : new SSEClientTransport(new URL(config.url!), {
           requestInit: {
-            headers: config.headers || {}
+            headers: buildSseHeaders(config)
           }
         })
 
@@ -100,9 +171,14 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
       registerTool(tool.name, handler, sourceTag)
     }
 
+    // 标记为已连接
+    serverStates.set(config.id, { id: config.id, name: config.name, state: 'connected' })
     log('info', `MCP "${config.name}" connected, ${toolsList.tools.length} tools registered`)
   } catch (err) {
-    log('error', `Failed to connect MCP "${config.name}": ${(err as Error).message}`)
+    // 标记为失败
+    const errMsg = (err as Error).message
+    serverStates.set(config.id, { id: config.id, name: config.name, state: 'failed', error: errMsg })
+    log('error', `Failed to connect MCP "${config.name}": ${errMsg}`)
     throw err
   }
 }
@@ -112,26 +188,52 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
  */
 export async function disconnectMcpServer(id: string): Promise<void> {
   const conn = connections.get(id)
-  if (!conn) return
-  try {
-    await conn.client.close()
-    unregisterToolsBySource(`mcp:${id}`)
-    connections.delete(id)
+  if (conn) {
+    try {
+      await conn.client.close()
+    } catch (err) {
+      log('warn', `Error closing MCP "${conn.config.name}": ${(err as Error).message}`)
+    }
+  }
+  unregisterToolsBySource(`mcp:${id}`)
+  connections.delete(id)
+  serverStates.delete(id)
+  if (conn) {
     log('info', `MCP "${conn.config.name}" disconnected`)
-  } catch (err) {
-    log('warn', `Error disconnecting MCP "${conn.config.name}": ${(err as Error).message}`)
   }
 }
 
 /**
  * 重连所有配置中的 MCP Servers
+ * 非阻塞：有多少连上就用多少，连不上的标记为 failed
  */
 export async function reconnectAllMcpServers(configs: McpServerConfig[]): Promise<void> {
+  // 清理旧的 serverStates（保留正在重连的）
+  const oldStates = new Map(serverStates)
+  serverStates.clear()
+
   for (const config of configs) {
-    try {
-      await connectMcpServer(config)
-    } catch {
-      // 单个失败不阻塞其他
+    if (!config.enabled) continue
+    // 标记为连接中
+    serverStates.set(config.id, { id: config.id, name: config.name, state: 'connecting' })
+  }
+
+  // 并行连接所有服务器，互不阻塞
+  const results = await Promise.allSettled(
+    configs.filter(c => c.enabled).map(c => connectMcpServer(c))
+  )
+
+  // 检查结果（connectMcpServer 内部已设置 state，这里只处理漏网之鱼）
+  for (let i = 0; i < results.length; i++) {
+    const config = configs.filter(c => c.enabled)[i]
+    const result = results[i]
+    if (result.status === 'rejected' && !serverStates.has(config.id)) {
+      serverStates.set(config.id, {
+        id: config.id,
+        name: config.name,
+        state: 'failed',
+        error: result.reason?.message || 'Unknown error'
+      })
     }
   }
 }

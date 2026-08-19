@@ -340,10 +340,11 @@ function McpSettings({ servers, onChange }: {
               <select
                 className="input-field w-full text-sm"
                 value={s.type}
-                onChange={(e) => updateServer(i, { type: e.target.value as 'stdio' | 'sse' })}
+                onChange={(e) => updateServer(i, { type: e.target.value as 'stdio' | 'sse' | 'streamable-http' })}
               >
                 <option value="stdio">stdio</option>
                 <option value="sse">SSE</option>
+                <option value="streamable-http">Streamable HTTP</option>
               </select>
             </div>
             {s.type === 'stdio' ? (
@@ -386,15 +387,88 @@ function McpSettings({ servers, onChange }: {
                 </div>
               </>
             ) : (
-              <div className="col-span-2">
-                <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.url')}</label>
-                <input
-                  className="input-field w-full text-sm font-mono"
-                  value={s.url || ''}
-                  onChange={(e) => updateServer(i, { url: e.target.value })}
-                  placeholder="https://example.com/mcp"
-                />
-              </div>
+              <>
+                <div className="col-span-2">
+                  <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.url')}</label>
+                  <input
+                    className="input-field w-full text-sm font-mono"
+                    value={s.url || ''}
+                    onChange={(e) => updateServer(i, { url: e.target.value })}
+                    placeholder="https://example.com/mcp"
+                  />
+                </div>
+                {/* 认证方式 */}
+                <div className="col-span-2">
+                  <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.authType')}</label>
+                  <select
+                    className="input-field w-full text-sm"
+                    value={s.authType || 'none'}
+                    onChange={(e) => updateServer(i, { authType: e.target.value as 'none' | 'bearer' | 'apikey' | 'custom' })}
+                  >
+                    <option value="none">{t('settings.mcp.authNone')}</option>
+                    <option value="bearer">{t('settings.mcp.authBearer')}</option>
+                    <option value="apikey">{t('settings.mcp.authApiKey')}</option>
+                    <option value="custom">{t('settings.mcp.authCustom')}</option>
+                  </select>
+                </div>
+                {/* Bearer Token */}
+                {s.authType === 'bearer' && (
+                  <div className="col-span-2">
+                    <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.authToken')}</label>
+                    <input
+                      className="input-field w-full text-sm font-mono"
+                      type="password"
+                      value={s.authToken || ''}
+                      onChange={(e) => updateServer(i, { authToken: e.target.value })}
+                      placeholder="eyJhbGciOiJIUzI1NiIs..."
+                    />
+                  </div>
+                )}
+                {/* API Key */}
+                {s.authType === 'apikey' && (
+                  <>
+                    <div>
+                      <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.authHeader')}</label>
+                      <input
+                        className="input-field w-full text-sm font-mono"
+                        value={s.authHeader || ''}
+                        onChange={(e) => updateServer(i, { authHeader: e.target.value })}
+                        placeholder="X-API-Key"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.apiKey')}</label>
+                      <input
+                        className="input-field w-full text-sm font-mono"
+                        type="password"
+                        value={s.apiKey || ''}
+                        onChange={(e) => updateServer(i, { apiKey: e.target.value })}
+                        placeholder="sk-xxx"
+                      />
+                    </div>
+                  </>
+                )}
+                {/* 自定义 Headers */}
+                {s.authType === 'custom' && (
+                  <div className="col-span-2">
+                    <label className="text-xs text-text-muted block mb-1">{t('settings.mcp.customHeaders')}</label>
+                    <textarea
+                      className="input-field w-full text-sm font-mono"
+                      rows={3}
+                      value={Object.entries(s.headers || {}).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                      onChange={(e) => {
+                        const headers: Record<string, string> = {}
+                        for (const line of e.target.value.split('\n')) {
+                          const colon = line.indexOf(':')
+                          if (colon > 0) headers[line.slice(0, colon).trim()] = line.slice(colon + 1).trim()
+                        }
+                        updateServer(i, { headers })
+                      }}
+                      placeholder={'Authorization: Bearer xxx\nX-Custom-Header: value'}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

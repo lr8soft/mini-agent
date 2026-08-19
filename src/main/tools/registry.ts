@@ -50,6 +50,17 @@ export function getAllTools(): ToolDefinition[] {
   return Array.from(registry.values()).map(e => e.handler.definition)
 }
 
+/**
+ * 按 source 过滤获取工具定义
+ * 接受字符串精确匹配或谓词函数
+ */
+export function getToolsBySource(filter: string | ((source: string) => boolean)): ToolDefinition[] {
+  const predicate = typeof filter === 'string' ? (s: string) => s === filter : filter
+  return Array.from(registry.entries())
+    .filter(([, entry]) => predicate(entry.source))
+    .map(([, entry]) => entry.handler.definition)
+}
+
 export function clearTools(source?: string) {
   if (source) {
     unregisterToolsBySource(source)

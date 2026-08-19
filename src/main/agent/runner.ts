@@ -4,9 +4,10 @@
 // ============================================================
 import type { ChatMessage, ContentPart, ProviderConfig, ToolCall } from '../../shared/types'
 import { streamChat, log } from '../llm/provider'
-import { getTool, getAllTools, getToolPermission, type ToolContext } from '../tools/registry'
+import { getTool, getAllTools, getToolPermission, getToolsBySource, type ToolContext } from '../tools/registry'
 import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
+import { getMcpConnectionStatus } from '../mcp/client'
 
 const MAX_TOOL_ROUNDS = 20      // 单次对话最大工具调用轮数，防止死循环
 
@@ -55,7 +56,7 @@ export async function runAgent(
 ): Promise<ChatMessage[]> {
   const { provider, workspacePath, messages, signal, permissionCheck, modelOverride, sessionId, memoryEnabled } = opts
 
-  // 构建系统提示词（含记忆注入）
+  // 构建系统提示词（含记忆注入 + MCP 工具动态列表）
   const skillsPrompt = skillsPromptGetter ? skillsPromptGetter() : ''
   const memoryPrompt = memoryEnabled ? buildMemoryPrompt(getLastUserMessage(messages)) : ''
   const systemPrompt = buildSystemPrompt(workspacePath, skillsPrompt, memoryPrompt, opts.systemPromptExtra)
@@ -232,12 +233,47 @@ export async function runAgent(
  * 构建系统提示词
  */
 function buildSystemPrompt(workspacePath: string, skillsPrompt: string, memoryPrompt: string, extra?: string): string {
+  // 动态获取 MCP 工具列表 + 未连接的 MCP 服务器，注入到 system prompt 中
+  const mcpStatus = getMcpConnectionStatus()
+  let mcpSection = ''
+
+  const connectedServers = mcpStatus.filter(s => s.connected)
+  const disconnectedServers = mcpStatus.filter(s => !s.connected)
+
+  if (connectedServers.length > 0 || disconnectedServers.length > 0) {
+    const lines: string[] = ['\n\n## MCP Tools (External integrations)']
+
+    if (connectedServers.length > 0) {
+      const mcpTools = getToolsBySource((s) => s.startsWith('mcp:'))
+      if (mcpTools.length > 0) {
+        lines.push('The following MCP tools are connected and available. Use them when the task matches their capabilities:')
+        for (const t of mcpTools) {
+          const fn = t.function
+          const desc = fn.description || '(no description)'
+          const params = fn.parameters as Record<string, unknown>
+          const props = params?.properties as Record<string, { type?: string; description?: string }> | undefined
+          const paramNames = props ? Object.entries(props).map(([k, v]) => `${k}(${v.type || 'any'})`).join(', ') : '(none)'
+          lines.push(`- **${fn.name}**: ${desc} (params: ${paramNames})`)
+        }
+      }
+    }
+
+    if (disconnectedServers.length > 0) {
+      const names = disconnectedServers.map(s => s.name).join(', ')
+      lines.push(`\nNote: The following MCP servers are not currently connected (still connecting or failed): ${names}. Their tools are temporarily unavailable.`)
+    }
+
+    lines.push('\nWhen a user\'s request could benefit from an MCP tool, prefer using it over built-in tools.')
+
+    mcpSection = lines.join('\n')
+  }
+
   let prompt = `You are MiniAgent, a powerful AI coding assistant operating in an Electron desktop environment.
 
 ## Environment
 - You are connected to a local workspace at: ${workspacePath}
 - You have access to tools for reading/writing files, running shell commands, and searching code.
-- You also have access to MCP tools and Skills for extended capabilities.
+- You also have access to MCP tools and Skills for extended capabilities.${mcpSection}
 - You have a headless Chromium browser (via Playwright) with tools: browser_navigate, browser_click, browser_type, browser_screenshot, browser_get_text, browser_get_html, browser_wait, browser_close.
 
 ## Desktop Control

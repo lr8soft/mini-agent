@@ -90,12 +90,20 @@ export interface ToolResult {
 export interface McpServerConfig {
   id: string
   name: string
-  type: 'stdio' | 'sse'
+  type: 'stdio' | 'sse' | 'streamable-http'
   command?: string                 // stdio 模式
   args?: string[]
   env?: Record<string, string>
   url?: string                     // sse 模式
-  headers?: Record<string, string>
+  headers?: Record<string, string> // sse 模式自定义 headers
+  /** SSE 认证类型快捷配置 */
+  authType?: 'none' | 'bearer' | 'apikey' | 'custom'
+  /** Bearer Token（authType=bearer 时使用） */
+  authToken?: string
+  /** API Key（authType=apikey 时使用，发送到 authHeader 指定的 header） */
+  apiKey?: string
+  /** API Key 使用的 header 名称（authType=apikey 时使用，默认 X-API-Key） */
+  authHeader?: string
   enabled: boolean
 }
 
