@@ -1,4 +1,4 @@
-# MiniAgent
+# Zhumora
 
 <p align="center">
   <img src="https://img.shields.io/badge/Electron-43-47848F?logo=electron&logoColor=white" alt="Electron" />
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <strong>A desktop AI coding agent platform</strong> — like OpenCode / Codex, fully local and provider-agnostic
+  <strong>An open-source AI agent that can code, automate tasks, and operate your computer</strong>
 </p>
 
 <p align="center">

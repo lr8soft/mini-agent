@@ -1,4 +1,4 @@
-# MiniAgent
+# Zhumora
 
 <p align="center">
   <img src="https://img.shields.io/badge/Electron-43-47848F?logo=electron&logoColor=white" alt="Electron" />
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <strong>桌面端 AI 编码智能体平台</strong> —— 类似 OpenCode / Codex，完全本地运行、模型厂商无关
+  <strong>开源 AI 智能体</strong> —— 能写代码、自动化任务、操作你的电脑，完全本地运行、模型厂商无关
 </p>
 
 <p align="center">

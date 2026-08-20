@@ -1,7 +1,7 @@
 // Español
 export default {
   app: {
-    name: 'MiniAgent'
+    name: 'Zhumora'
   },
   window: {
     minimize: 'Minimizar',

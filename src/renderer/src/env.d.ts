@@ -1,9 +1,9 @@
 // 渲染进程环境类型声明
-import type { MiniAgentAPI } from '../../preload/index'
+import type { ZhumoraAPI } from '../../preload/index'
 
 declare global {
   interface Window {
-    api: MiniAgentAPI
+    api: ZhumoraAPI
   }
 }
 

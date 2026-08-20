@@ -61,7 +61,7 @@ export function getEffectiveLanguage(lang: AppLanguage): string {
  */
 function getStoredLanguage(): AppLanguage {
   try {
-    const stored = localStorage.getItem('mini-agent-language')
+    const stored = localStorage.getItem('zhumora-language')
     if (stored && SUPPORTED_LANGUAGES.some(l => l.code === stored)) {
       return stored as AppLanguage
     }
@@ -74,7 +74,7 @@ function getStoredLanguage(): AppLanguage {
  */
 export function storeLanguage(lang: AppLanguage): void {
   try {
-    localStorage.setItem('mini-agent-language', lang)
+    localStorage.setItem('zhumora-language', lang)
   } catch { /* localStorage not available */ }
 }
 

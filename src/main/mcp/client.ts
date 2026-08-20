@@ -139,7 +139,7 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
             })
 
         const client = new Client(
-          { name: 'mini-agent', version: '0.1.0' },
+          { name: 'zhumora', version: '0.1.0' },
           { capabilities: {} }
         )
         try {

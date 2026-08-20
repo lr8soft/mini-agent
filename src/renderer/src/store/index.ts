@@ -9,8 +9,8 @@ const api = window.api
 // ---------- 主题 / 字号 ----------
 export type Theme = 'light' | 'dark' | 'system'
 
-export const THEME_STORAGE_KEY = 'miniagent.theme'
-export const FONT_SIZE_STORAGE_KEY = 'miniagent.fontSize'
+export const THEME_STORAGE_KEY = 'zhumora.theme'
+export const FONT_SIZE_STORAGE_KEY = 'zhumora.fontSize'
 /** 可选字号（px，作用于根字号，全局 rem 等比缩放） */
 export const FONT_SIZE_OPTIONS = [13, 14, 15, 16, 18]
 export const DEFAULT_FONT_SIZE = 15

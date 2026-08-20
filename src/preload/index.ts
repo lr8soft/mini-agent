@@ -162,7 +162,7 @@ const api = {
   }
 }
 
-export type MiniAgentAPI = typeof api
+export type ZhumoraAPI = typeof api
 
 // 使用 contextBridge 安全暴露
 contextBridge.exposeInMainWorld('api', api)

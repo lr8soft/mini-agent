@@ -1,9 +1,9 @@
 {
-  "name": "mini-agent",
+  "name": "zhumora",
   "version": "0.1.0",
-  "description": "A desktop AI coding agent platform — like OpenCode/Codex, in Electron",
+  "description": "An open-source AI agent that can code, automate tasks, and operate your computer.",
   "main": "./out/main/index.js",
-  "author": "mini-agent",
+  "author": "zhumora",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -51,8 +51,8 @@
     "zustand": "^5.0.15"
   },
   "build": {
-    "appId": "com.miniagent.app",
-    "productName": "MiniAgent",
+    "appId": "com.zhumora.app",
+    "productName": "Zhumora",
     "directories": {
       "output": "release"
     },

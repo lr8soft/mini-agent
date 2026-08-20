@@ -20,7 +20,7 @@ function createWindow(): BrowserWindow {
     show: false,
     frame: false,
     autoHideMenuBar: true,
-    title: 'MiniAgent',
+    title: 'Zhumora',
     backgroundColor: '#f5f6f8',
     icon: is.dev
       ? path.join(__dirname, '../../src/renderer/public/icon.ico')
@@ -58,7 +58,7 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(async () => {
   // 设置应用信息
-  electronApp.setAppUserModelId('com.miniagent.app')
+  electronApp.setAppUserModelId('com.zhumora.app')
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

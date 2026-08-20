@@ -172,7 +172,7 @@ export function buildSystemPrompt(
   const builtinSection = buildBuiltinToolSection()
   const mcpSection = buildMcpSection()
 
-  let prompt = `You are MiniAgent, a powerful AI coding assistant operating in an Electron desktop environment.
+  let prompt = `You are Zhumora, an open-source AI agent that can code, automate tasks, and operate your computer. You run in a local Electron desktop environment.
 
 ## Environment
 - You are connected to a local workspace at: ${workspacePath}

@@ -10,7 +10,7 @@ let db: Database.Database | null = null
 
 export function initDatabase(): void {
   const userDataPath = app.getPath('userData')
-  const dbPath = path.join(userDataPath, 'mini-agent.db')
+  const dbPath = path.join(userDataPath, 'zhumora.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
