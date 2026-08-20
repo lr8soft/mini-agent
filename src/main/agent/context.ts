@@ -5,6 +5,7 @@
 import type { ChatMessage, ProviderConfig } from '../../shared/types'
 import { complete } from '../llm/provider'
 import { log } from '../llm/logger'
+import { planCompact } from './history'
 
 // 默认上下文窗口（API 未返回时的 fallback）
 const DEFAULT_CONTEXT_WINDOW = 32768
@@ -224,8 +225,13 @@ export async function autoCompact(
     return messages
   }
 
-  const toCompress = conversationMsgs.slice(0, conversationMsgs.length - KEEP_RECENT_COUNT)
-  const toKeep = conversationMsgs.slice(conversationMsgs.length - KEEP_RECENT_COUNT)
+  // 安全切分：切点不会落在 assistant(tool_calls) 与其 tool 结果之间，
+  // 否则压缩后重排会产生悬空 tool 消息，LLM API 直接 400
+  const { toCompress, toKeep } = planCompact(conversationMsgs, KEEP_RECENT_COUNT)
+  if (toCompress.length === 0) {
+    log('info', 'Auto compact: no safe boundary to split, skipping')
+    return messages
+  }
 
   log('info', `Auto compact: compressing ${toCompress.length} messages, keeping ${toKeep.length} recent`)
 

@@ -249,6 +249,8 @@ Before sending to LLM
 │ - Summarize rest │
 │   via LLM        │
 └────────┬─────────┘
+ Note: the split point is aligned to full tool-call
+ rounds so the compacted sequence stays protocol-valid
          │
          ▼
 ┌──────────────────┐

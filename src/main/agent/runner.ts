@@ -9,6 +9,7 @@ import { getTool, getAllTools, type ToolContext } from '../tools/registry'
 import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
 import { buildSystemPrompt } from '../agent/promptBuilder'
+import { sanitizeHistory } from './history'
 
 const MAX_TOOL_ROUNDS = 20      // 单次对话最大工具调用轮数，防止死循环
 
@@ -68,10 +69,17 @@ export async function runAgent(
   const memoryPrompt = memoryEnabled ? buildMemoryPrompt(getLastUserMessage(messages)) : ''
   const systemPrompt = buildSystemPrompt(workspacePath, skillsPrompt, memoryPrompt, opts.systemPromptExtra)
 
+  // 清洗 abort/崩溃遗留的非法序列（孤儿 tool 结果、不完整的 tool_call 组），
+  // 否则第一轮请求就会 400
+  const sanitizedMessages = sanitizeHistory(messages)
+  if (sanitizedMessages.length !== messages.length) {
+    log('info', `Sanitized history: removed ${messages.length - sanitizedMessages.length} dangling message(s)`)
+  }
+
   // 工作消息列表（含 system）
   const workingMessages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...messages
+    ...sanitizedMessages
   ]
 
   // 运行时获取上下文窗口大小（从 API 动态检测）

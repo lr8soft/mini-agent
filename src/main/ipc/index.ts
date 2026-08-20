@@ -6,6 +6,7 @@ import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import type { AppSettings, ChatMessage } from '../../shared/types'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
+import { sanitizeHistory } from '../agent/history'
 import { log } from '../llm/logger'
 import { registerTool, clearTools } from '../tools/registry'
 import { builtinTools } from '../tools/builtin'
@@ -122,13 +123,14 @@ export function setupIpc(win: BrowserWindow): void {
 
     // 获取历史消息
     const history = db.getMessages(sessionId)
-    const chatMessages: ChatMessage[] = history.map(m => ({
+    // 清洗 abort/崩溃遗留的非法序列（孤儿 tool 结果、不完整的 tool_call 组）
+    const chatMessages: ChatMessage[] = sanitizeHistory(history.map(m => ({
       role: m.role,
       content: m.content,
       tool_calls: m.toolCalls,
       tool_call_id: m.toolCallId,
       name: m.toolName
-    }))
+    })))
 
     // 构建回调（流式 token / 工具调用 / DB 持久化）
     const { callbacks } = buildAgentCallbacks(sessionId, e.sender)
