@@ -71,7 +71,7 @@ export default function SettingsView() {
 
         {/* 保存按钮 */}
         <div className="settings-footer">
-          <button className="btn-primary" onClick={() => saveSettings(settings)}>
+          <button className="btn-primary" onClick={() => saveSettings(settings, true)}>
             {t('settings.save')}
           </button>
         </div>

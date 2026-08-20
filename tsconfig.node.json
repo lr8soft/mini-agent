@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+
+  "compilerOptions": {
+    "lib": [
+      "ES2022"
+    ],
+
+    "types": [
+      "node",
+      "electron-vite/node"
+    ],
+
+    "paths": {
+      "@shared/*": [
+        "src/shared/*"
+      ]
+    }
+  },
+
+  "include": [
+    "electron.vite.config.ts",
+
+    "src/main/**/*.ts",
+    "src/main/**/*.d.ts",
+
+    "src/preload/**/*.ts",
+    "src/preload/**/*.d.ts",
+
+    "src/shared/**/*.ts",
+    "src/shared/**/*.d.ts"
+  ]
+}

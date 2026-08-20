@@ -81,7 +81,7 @@ interface AppState {
   // 设置
   settings: AppSettings
   loadSettings: () => Promise<void>
-  saveSettings: (s: AppSettings) => Promise<void>
+  saveSettings: (s: AppSettings, returnToChat?: boolean) => Promise<void>
 
   // Agent 操作
   sendMessage: (text: string) => Promise<void>
@@ -249,12 +249,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const settings = await api.settings.get()
     set({ settings })
   },
-  saveSettings: async (s) => {
+  saveSettings: async (s, returnToChat = false) => {
     try {
       await api.settings.save(s)
       set({ settings: s })
-      // 保存成功后自动回到聊天页
-      set({ view: 'chat' })
+      // 仅在用户显式点击"保存"按钮时回到聊天页；实时输入更新不应触发跳转
+      if (returnToChat) set({ view: 'chat' })
     } catch (err) {
       console.error('Failed to save settings:', err)
     }
