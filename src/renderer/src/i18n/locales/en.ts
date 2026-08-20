@@ -24,6 +24,7 @@ export default {
     autoApproveOnHint: 'Auto-approve ON: all tool calls skip permission',
     autoApproveOffHint: 'Auto-approve OFF: tools need permission',
     thinking: 'Thinking...',
+    retrying: 'Network unstable, retrying ({{attempt}}/{{max}})…',
     stop: 'Stop',
     send: 'Send',
     welcome: 'Type a message below to start a conversation.',
@@ -141,7 +142,12 @@ export default {
       themeDark: 'Dark',
       fontSize: 'Font Size',
       fontSizeHint: 'Scales all interface text. Applies immediately and is remembered.',
-      fontSizeOption: '{{px}} px'
+      fontSizeOption: '{{px}} px',
+      network: 'Network',
+      networkHint: 'Automatic retry policy for failed LLM requests and MCP connections.',
+      maxRetries: 'Retries',
+      maxRetriesHint: 'How many times to retry after a request fails. 0 = no retry. Delay grows from 1s up to 30s.',
+      retriesUnlimited: 'Unlimited retries'
     },
     usage: {
       hint: 'Token usage statistics. Input/output tokens are recorded for each LLM call automatically.',

@@ -24,6 +24,7 @@ export default {
     autoApproveOnHint: '自動承認オン: すべてのツール呼び出しが権限確認をスキップ',
     autoApproveOffHint: '自動承認オフ: ツールに権限が必要',
     thinking: '考え中...',
+    retrying: 'ネットワークが不安定です。再試行中（{{attempt}}/{{max}}）…',
     stop: '停止',
     send: '送信',
     welcome: '下にメッセージを入力して会話を開始してください。',
@@ -141,7 +142,12 @@ export default {
       themeDark: 'ダーク',
       fontSize: 'フォントサイズ',
       fontSizeHint: 'すべてのUIテキストを等比例的に拡大縮小します。即座に反映され、記憶されます。',
-      fontSizeOption: '{{px}} px'
+      fontSizeOption: '{{px}} px',
+      network: 'ネットワーク',
+      networkHint: 'LLM リクエストと MCP 接続の失敗時の自動再試行設定。',
+      maxRetries: '再試行数',
+      maxRetriesHint: 'リクエスト失敗後の再試行数。0 = 再試行しない。間隔は 1 秒から最大 30 秒まで増加します。',
+      retriesUnlimited: '無限に再試行'
     },
     usage: {
       hint: 'トークン使用量統計。各LLM呼び出しのinput/outputトークンが自動記録されます。',

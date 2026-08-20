@@ -91,7 +91,7 @@
       }
     ],
     "win": {
-      "icon": "src/renderer/public/logo.png",
+      "icon": "src/renderer/public/icon.ico",
       "target": [
         "nsis"
       ],

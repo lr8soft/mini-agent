@@ -60,7 +60,8 @@ export default function App() {
           const last = msgs[msgs.length - 1]
           // append 到最后一条 assistant 消息（但不是 tool_call 消息）
           if (last && last.role === 'assistant' && !last.toolCalls?.length) {
-            msgs[msgs.length - 1] = { ...last, content: last.content + token }
+            // append 到最后一条 assistant 消息（思考占位 / 流式消息），占位收到首 token 即转为流式
+            msgs[msgs.length - 1] = { ...last, content: last.content + token, status: 'streaming' }
           } else {
             msgs.push({
               id: messageId,
@@ -79,6 +80,9 @@ export default function App() {
       window.api.agent.onToolCall(({ toolCall }) => {
         useAppStore.setState((s) => {
           const msgs = [...s.messages]
+          // 首个响应是工具调用（无文本）→ 移除思考占位
+          const thinkingIdx = msgs.findIndex(m => m.status === 'thinking')
+          if (thinkingIdx >= 0) msgs.splice(thinkingIdx, 1)
           msgs.push({
             id: `tc-${Date.now()}`,
             sessionId: s.activeSessionId || '',
@@ -114,7 +118,7 @@ export default function App() {
       window.api.agent.onComplete(({ sessionId }) => {
         const { activeSessionId } = useAppStore.getState()
         if (activeSessionId === sessionId) {
-          useAppStore.setState({ isRunning: false, streamingMessageId: null })
+          useAppStore.setState({ isRunning: false, streamingMessageId: null, retryStatus: null })
           // 重新加载消息获取完整数据库记录
           useAppStore.getState().loadMessages(sessionId)
         }
@@ -125,7 +129,21 @@ export default function App() {
       window.api.agent.onError(({ sessionId, error }) => {
         const { activeSessionId } = useAppStore.getState()
         if (activeSessionId === sessionId) {
-          useAppStore.setState({ isRunning: false, streamingMessageId: null })
+          useAppStore.setState((s) => ({
+            isRunning: false,
+            streamingMessageId: null,
+            retryStatus: null,
+            // 重试耗尽报错后，移除思考占位
+            messages: s.messages.filter(m => m.status !== 'thinking')
+          }))
+        }
+      }),
+
+      // 网络重试状态
+      window.api.agent.onRetry(({ sessionId, failedAttempt, maxRetries }) => {
+        const { activeSessionId } = useAppStore.getState()
+        if (activeSessionId === sessionId) {
+          useAppStore.setState({ retryStatus: { failedAttempt, maxRetries } })
         }
       }),
 

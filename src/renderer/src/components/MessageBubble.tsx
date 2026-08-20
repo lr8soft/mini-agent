@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import { ChevronDown, ChevronUp, Terminal, Wrench, XCircle } from 'lucide-react'
 import type { UIMessage, ToolCall } from '@shared/types'
+import { useAppStore } from '../store'
 
 interface Props {
   message: UIMessage
@@ -12,6 +13,7 @@ interface Props {
 
 export default function MessageBubble({ message, toolStatuses }: Props) {
   const { t } = useTranslation()
+  const retryStatus = useAppStore(s => s.retryStatus)
 
   // 用户消息
   if (message.role === 'user') {
@@ -40,11 +42,18 @@ export default function MessageBubble({ message, toolStatuses }: Props) {
       </div>
 
       {/* 内容 */}
-      {message.content && (
+      {message.status === 'thinking' ? (
+        <div className="thinking-line">
+          <span className="spinner" />
+          {retryStatus
+            ? t('chat.retrying', { attempt: retryStatus.failedAttempt, max: retryStatus.maxRetries < 0 ? '∞' : retryStatus.maxRetries })
+            : t('chat.thinking')}
+        </div>
+      ) : message.content ? (
         <div className="markdown-body">
           <ReactMarkdown>{message.content}</ReactMarkdown>
         </div>
-      )}
+      ) : null}
 
       {/* 工具调用列表 */}
       {message.toolCalls?.map(tc => (

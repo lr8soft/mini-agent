@@ -85,6 +85,11 @@ const api = {
       ipcRenderer.on('agent:error', handler)
       return () => ipcRenderer.removeListener('agent:error', handler)
     },
+    onRetry: (cb: (data: { sessionId: string; failedAttempt: number; maxRetries: number }) => void) => {
+      const handler = (_e: any, data: any) => cb(data)
+      ipcRenderer.on('agent:retry', handler)
+      return () => ipcRenderer.removeListener('agent:retry', handler)
+    },
     onPermissionRequest: (cb: (data: { sessionId: string; permId: string; toolName: string; args: any }) => void) => {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('agent:permission_request', handler)

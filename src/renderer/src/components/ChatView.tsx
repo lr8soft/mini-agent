@@ -6,7 +6,7 @@ import MessageBubble from './MessageBubble'
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, autoApprove, setAutoApprove } = useAppStore()
+  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, autoApprove, setAutoApprove } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -29,7 +29,7 @@ export default function ChatView() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages])
+  }, [messages, retryStatus])
 
   // 快捷键
   useEffect(() => {
@@ -142,6 +142,13 @@ export default function ChatView() {
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} toolStatuses={toolStatuses} />
           ))}
+          {/* 重试状态行（思考占位已被移除时显示，如工具轮之间的重试） */}
+          {retryStatus && isRunning && !messages.some(m => m.status === 'thinking') && (
+            <div className="retry-status">
+              <span className="spinner" />
+              <span>{t('chat.retrying', { attempt: retryStatus.failedAttempt, max: retryStatus.maxRetries < 0 ? '∞' : retryStatus.maxRetries })}</span>
+            </div>
+          )}
         </div>
       </div>
 

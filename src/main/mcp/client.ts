@@ -10,6 +10,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { McpServerConfig, ToolDefinition } from '../../shared/types'
 import { registerTool, unregisterToolsBySource, type ToolHandler, type ToolContext } from '../tools/registry'
 import { log } from '../llm/logger'
+import { getMaxRetries, withRetry } from '../net/retry'
 
 interface ActiveConnection {
   client: Client
@@ -114,34 +115,50 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
       }
     }
 
-    const transport = config.type === 'stdio'
-      ? new StdioClientTransport({
-          command: cmd,
-          args: cmdArgs,
-          env: { ...process.env, ...(config.env || {}) } as Record<string, string>
-        })
-      : config.type === 'streamable-http'
-      ? new StreamableHTTPClientTransport(new URL(config.url!), {
-          requestInit: {
-            headers: buildSseHeaders(config)
-          }
-        })
-      : new SSEClientTransport(new URL(config.url!), {
-          requestInit: {
-            headers: buildSseHeaders(config)
-          }
-        })
+    // 网络失败自动重试（设置可配，支持无限）
+    // 每次尝试都新建 transport：SSE/HTTP transport 是一次性的，stdio 需重新拉起子进程
+    const maxRetries = getMaxRetries()
+    const connected = await withRetry(
+      async () => {
+        const transport = config.type === 'stdio'
+          ? new StdioClientTransport({
+              command: cmd,
+              args: cmdArgs,
+              env: { ...process.env, ...(config.env || {}) } as Record<string, string>
+            })
+          : config.type === 'streamable-http'
+          ? new StreamableHTTPClientTransport(new URL(config.url!), {
+              requestInit: {
+                headers: buildSseHeaders(config)
+              }
+            })
+          : new SSEClientTransport(new URL(config.url!), {
+              requestInit: {
+                headers: buildSseHeaders(config)
+              }
+            })
 
-    const client = new Client(
-      { name: 'mini-agent', version: '0.1.0' },
-      { capabilities: {} }
+        const client = new Client(
+          { name: 'mini-agent', version: '0.1.0' },
+          { capabilities: {} }
+        )
+        try {
+          await client.connect(transport)
+        } catch (err) {
+          // 清理失败连接，避免子进程/套接字泄漏
+          try { await client.close() } catch { /* ignore */ }
+          throw err
+        }
+        return { client, toolsList: await client.listTools() }
+      },
+      { maxRetries, label: `MCP connect "${config.name}"` }
     )
 
-    await client.connect(transport)
-    connections.set(config.id, { client, config })
+    connections.set(config.id, { client: connected.client, config })
 
     // 发现工具
-    const toolsList = await client.listTools()
+    const client = connected.client
+    const toolsList = connected.toolsList
     const sourceTag = `mcp:${config.id}`
     unregisterToolsBySource(sourceTag)
 

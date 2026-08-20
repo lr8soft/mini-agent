@@ -4,6 +4,7 @@
 // ============================================================
 import type { ChatMessage, ProviderConfig, ToolCall, ToolDefinition } from '../../shared/types'
 import { log } from './logger'
+import { HttpError, getMaxRetries, isRetriableError, withRetry } from '../net/retry'
 
 export interface TokenUsage {
   prompt_tokens: number
@@ -15,6 +16,8 @@ export interface StreamCallbacks {
   onToken?: (token: string) => void
   onComplete?: (fullText: string, toolCalls: ToolCall[]) => void
   onError?: (error: Error) => void
+  /** 网络失败，正在自动重试（failedAttempt = 已失败次数，maxRetries = -1 表示无限） */
+  onRetry?: (failedAttempt: number, maxRetries: number, error: Error) => void
 }
 
 export interface CompletionParams {
@@ -27,9 +30,23 @@ export interface CompletionParams {
   signal?: AbortSignal
 }
 
+/** 流空闲超时：120s 无任何数据块则中止（防止半开连接永久挂起；未输出时该错误可重试） */
+const STREAM_IDLE_TIMEOUT_MS = 120_000
+
+/** 单次流式尝试的结果 */
+interface AttemptResult {
+  content: string
+  toolCalls: ToolCall[]
+  usage?: TokenUsage
+  /** 用户主动中止（按部分内容正常完成处理，保持旧行为） */
+  aborted?: boolean
+}
+
 /**
  * 发起流式补全请求
  * 返回 { content, toolCalls }
+ * 网络失败（5xx / 超时 / 连接重置等）在尚未向 UI 输出任何 token 前自动重试；
+ * 重试次数读取设置 maxRetries（-1 = 无限），退避 1s→2s→4s… 上限 30s。
  */
 export async function streamChat(
   provider: ProviderConfig,
@@ -64,10 +81,61 @@ export async function streamChat(
   if (params.reasoningEffort) body.reasoning_effort = params.reasoningEffort
 
   const url = `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`
+  const maxRetries = getMaxRetries()
+  // 一旦向回调发出第一个 token / tool call 即置 true（之后不再重试，避免重复输出）
+  const state = { emitted: false }
+
+  try {
+    const result = await withRetry(
+      () => attemptStreamChat(url, body, provider, params, cb, state),
+      {
+        maxRetries,
+        label: `LLM ${provider.name || provider.baseUrl}`,
+        // 仅在尚未向 UI 输出任何内容时才重试（否则聊天区会收到重复内容）
+        shouldRetry: (err) => !state.emitted && isRetriableError(err),
+        onRetry: (failedAttempt, max, error) => cb?.onRetry?.(failedAttempt, max, error)
+      }
+    )
+    cb?.onComplete?.(result.content, result.toolCalls)
+    return { content: result.content, toolCalls: result.toolCalls, usage: result.usage }
+  } catch (err) {
+    cb?.onError?.(err as Error)
+    throw err
+  }
+}
+
+/**
+ * 单次流式尝试（不含重试逻辑，重试由外层 streamChat 处理）
+ * 中止处理：
+ * - 用户中止（params.signal）→ 按部分内容正常完成返回（不重试）
+ * - 流空闲超时（120s 无数据）→ 抛出可重试错误
+ */
+async function attemptStreamChat(
+  url: string,
+  body: Record<string, unknown>,
+  provider: ProviderConfig,
+  params: CompletionParams,
+  cb: StreamCallbacks | undefined,
+  state: { emitted: boolean }
+): Promise<AttemptResult> {
   let fullText = ''
   const toolCallsMap = new Map<number, ToolCall>()
 
   let lastUsage: TokenUsage | undefined
+
+  // 用户中止信号 + 流空闲超时 合并为一个 AbortController
+  const ctrl = new AbortController()
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
+  const resetIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer)
+    idleTimer = setTimeout(() => ctrl.abort(), STREAM_IDLE_TIMEOUT_MS)
+  }
+  const onUserAbort = () => ctrl.abort()
+  if (params.signal) {
+    if (params.signal.aborted) ctrl.abort()
+    else params.signal.addEventListener('abort', onUserAbort, { once: true })
+  }
+  resetIdleTimer()
 
   try {
     const resp = await fetch(url, {
@@ -77,12 +145,12 @@ export async function streamChat(
         ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {})
       },
       body: JSON.stringify(body),
-      signal: params.signal
+      signal: ctrl.signal
     })
 
     if (!resp.ok) {
       const errText = await resp.text()
-      throw new Error(`LLM API ${resp.status}: ${errText.slice(0, 500)}`)
+      throw new HttpError(resp.status, `LLM API ${resp.status}: ${errText.slice(0, 500)}`)
     }
 
     const reader = resp.body?.getReader()
@@ -93,6 +161,7 @@ export async function streamChat(
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
+      resetIdleTimer()
       buffer += decoder.decode(value, { stream: true })
 
       const lines = buffer.split('\n')
@@ -121,12 +190,14 @@ export async function streamChat(
 
           // 文本增量
           if (delta.content) {
+            state.emitted = true
             fullText += delta.content
             cb?.onToken?.(delta.content)
           }
 
           // 工具调用增量（分片到达，需拼接）
           if (delta.tool_calls) {
+            state.emitted = true
             for (const tc of delta.tool_calls) {
               const idx = tc.index ?? 0
               if (!toolCallsMap.has(idx)) {
@@ -148,22 +219,26 @@ export async function streamChat(
       }
     }
 
-    const toolCalls = Array.from(toolCallsMap.values())
-    cb?.onComplete?.(fullText, toolCalls)
-    return { content: fullText, toolCalls, usage: lastUsage }
+    return { content: fullText, toolCalls: Array.from(toolCallsMap.values()), usage: lastUsage }
   } catch (err) {
-    const error = err as Error
-    if (error.name === 'AbortError') {
-      cb?.onComplete?.(fullText, Array.from(toolCallsMap.values()))
-      return { content: fullText, toolCalls: Array.from(toolCallsMap.values()), usage: lastUsage }
+    if (ctrl.signal.aborted) {
+      if (params.signal?.aborted) {
+        // 用户中止 → 部分内容按正常完成返回（不重试）
+        return { content: fullText, toolCalls: Array.from(toolCallsMap.values()), usage: lastUsage, aborted: true }
+      }
+      // 流空闲超时 → 抛出可重试错误（message 匹配重试规则）
+      throw new Error(`LLM stream idle timeout: no data received for ${STREAM_IDLE_TIMEOUT_MS / 1000}s`)
     }
-    cb?.onError?.(error)
-    throw error
+    throw err
+  } finally {
+    if (idleTimer) clearTimeout(idleTimer)
+    if (params.signal) params.signal.removeEventListener('abort', onUserAbort)
   }
 }
 
 /**
  * 非流式补全（简短调用，如生成会话标题）
+ * 网络失败自动重试（与 streamChat 同一策略）
  */
 export async function complete(
   provider: ProviderConfig,
@@ -172,30 +247,35 @@ export async function complete(
   maxTokens = 200
 ): Promise<string> {
   const url = `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {})
+  return withRetry(
+    async () => {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {})
+        },
+        body: JSON.stringify({
+          model: model || provider.defaultModel,
+          messages: messages.map(m => {
+            const msg: Record<string, unknown> = {
+              role: m.role,
+              content: Array.isArray(m.content) ? m.content : (m.content ?? '')
+            }
+            if (m.tool_calls && m.tool_calls.length > 0) msg.tool_calls = m.tool_calls
+            if (m.tool_call_id) msg.tool_call_id = m.tool_call_id
+            if (m.name) msg.name = m.name
+            return msg
+          }),
+          max_tokens: maxTokens,
+          temperature: 0.3,
+          stream: false
+        })
+      })
+      if (!resp.ok) throw new HttpError(resp.status, `LLM API ${resp.status}: ${await resp.text()}`)
+      const json: any = await resp.json()
+      return json.choices?.[0]?.message?.content || ''
     },
-    body: JSON.stringify({
-      model: model || provider.defaultModel,
-      messages: messages.map(m => {
-        const msg: Record<string, unknown> = {
-          role: m.role,
-          content: Array.isArray(m.content) ? m.content : (m.content ?? '')
-        }
-        if (m.tool_calls && m.tool_calls.length > 0) msg.tool_calls = m.tool_calls
-        if (m.tool_call_id) msg.tool_call_id = m.tool_call_id
-        if (m.name) msg.name = m.name
-        return msg
-      }),
-      max_tokens: maxTokens,
-      temperature: 0.3,
-      stream: false
-    })
-  })
-  if (!resp.ok) throw new Error(`LLM API ${resp.status}: ${await resp.text()}`)
-  const json: any = await resp.json()
-  return json.choices?.[0]?.message?.content || ''
+    { maxRetries: getMaxRetries(), label: `LLM complete ${provider.name || provider.baseUrl}` }
+  )
 }

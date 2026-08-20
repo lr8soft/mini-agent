@@ -24,6 +24,7 @@ export default {
     autoApproveOnHint: '自动批准已开启：所有工具调用跳过权限确认',
     autoApproveOffHint: '自动批准已关闭：工具调用需要权限确认',
     thinking: '思考中...',
+    retrying: '网络不稳定，正在重试（{{attempt}}/{{max}}）…',
     stop: '停止',
     send: '发送',
     welcome: '在下方输入消息开始对话。',
@@ -141,7 +142,12 @@ export default {
       themeDark: '深色',
       fontSize: '字号',
       fontSizeHint: '等比缩放全部界面文字，立即生效并记住。',
-      fontSizeOption: '{{px}} 像素'
+      fontSizeOption: '{{px}} 像素',
+      network: '网络',
+      networkHint: 'LLM 请求与 MCP 连接失败时的自动重试策略。',
+      maxRetries: '重试次数',
+      maxRetriesHint: '请求失败后的重试次数，0 = 不重试。重试间隔递增（1s 起，最长 30s）。',
+      retriesUnlimited: '无限重试'
     },
     usage: {
       hint: 'Token 用量统计。每次 LLM 调用的 input/output tokens 自动记录。',

@@ -24,6 +24,7 @@ export default {
     autoApproveOnHint: 'Auto-aprobar ON: todas las llamadas omiten permisos',
     autoApproveOffHint: 'Auto-aprobar OFF: las herramientas requieren permiso',
     thinking: 'Pensando...',
+    retrying: 'Red inestable, reintentando ({{attempt}}/{{max}})…',
     stop: 'Detener',
     send: 'Enviar',
     welcome: 'Escribe un mensaje abajo para iniciar una conversación.',
@@ -141,7 +142,12 @@ export default {
       themeDark: 'Oscuro',
       fontSize: 'Tamaño de fuente',
       fontSizeHint: 'Escala todo el texto de la interfaz. Se aplica de inmediato y se recuerda.',
-      fontSizeOption: '{{px}} px'
+      fontSizeOption: '{{px}} px',
+      network: 'Red',
+      networkHint: 'Reintento automático ante fallos en las peticiones LLM y las conexiones MCP.',
+      maxRetries: 'Reintentos',
+      maxRetriesHint: 'Cuántas veces reintentar una petición fallida. 0 = sin reintento. La espera crece de 1 s hasta 30 s.',
+      retriesUnlimited: 'Reintentos ilimitados'
     },
     usage: {
       hint: 'Estadísticas de uso de tokens. Los tokens de entrada/salida se registran automáticamente para cada llamada LLM.',

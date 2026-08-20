@@ -23,8 +23,8 @@ function createWindow(): BrowserWindow {
     title: 'MiniAgent',
     backgroundColor: '#f5f6f8',
     icon: is.dev
-      ? path.join(__dirname, '../../src/renderer/public/logo.png')
-      : path.join(__dirname, '../renderer/logo.png'),
+      ? path.join(__dirname, '../../src/renderer/public/icon.ico')
+      : path.join(__dirname, '../renderer/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       sandbox: false,

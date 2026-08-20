@@ -24,6 +24,7 @@ export default {
     autoApproveOnHint: 'Auto-Genehmigen AN: alle Tool-Aufrufe überspringen Berechtigungen',
     autoApproveOffHint: 'Auto-Genehmigen AUS: Tools benötigen Berechtigung',
     thinking: 'Denke nach...',
+    retrying: 'Netzwerk instabil, erneuter Versuch ({{attempt}}/{{max}})…',
     stop: 'Stopp',
     send: 'Senden',
     welcome: 'Geben Sie unten eine Nachricht ein, um eine Konversation zu starten.',
@@ -141,7 +142,12 @@ export default {
       themeDark: 'Dunkel',
       fontSize: 'Schriftgröße',
       fontSizeHint: 'Skaliert den gesamten Text der Oberfläche. Wird sofort angewendet und gemerkt.',
-      fontSizeOption: '{{px}} px'
+      fontSizeOption: '{{px}} px',
+      network: 'Netzwerk',
+      networkHint: 'Automatische Wiederholung fehlgeschlagener LLM-Anfragen und MCP-Verbindungen.',
+      maxRetries: 'Wiederholungen',
+      maxRetriesHint: 'Wie oft eine fehlgeschlagene Anfrage erneut versucht wird. 0 = keine Wiederholung. Verzögerung steigt von 1 s bis 30 s.',
+      retriesUnlimited: 'Unbegrenzt wiederholen'
     },
     usage: {
       hint: 'Token-Nutzungsstatistiken. Input/Output-Tokens werden automatisch für jeden LLM-Aufruf erfasst.',

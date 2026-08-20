@@ -219,7 +219,8 @@ function defaultSettings(): AppSettings {
     activeProviderId: 'zhuminet-default',
     workspacePath: app.getPath('home'),
     memoryEnabled: true,
-    language: 'auto'
+    language: 'auto',
+    maxRetries: 5
   }
 }
 

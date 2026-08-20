@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Check, FolderOpen, Globe, Monitor, Moon, Sun, Type } from 'lucide-react'
+import { Check, FolderOpen, Globe, Monitor, Moon, RefreshCw, Sun, Type, Wifi } from 'lucide-react'
 import { SUPPORTED_LANGUAGES, type AppLanguage, getEffectiveLanguage, storeLanguage } from '../../i18n'
 import { useAppStore, FONT_SIZE_OPTIONS, type Theme } from '../../store'
 
@@ -12,6 +12,7 @@ const THEME_OPTIONS: { value: Theme; icon: typeof Sun; labelKey: string }[] = [
 export function GeneralSettings() {
   const { t, i18n } = useTranslation()
   const { settings, saveSettings, theme, setTheme, fontSize, setFontSize } = useAppStore()
+  const isUnlimited = (settings.maxRetries ?? 5) === -1
 
   const pickDir = async () => {
     const dir = await window.api.settings.pickDirectory()
@@ -98,6 +99,51 @@ export function GeneralSettings() {
             </option>
           ))}
         </select>
+      </section>
+
+      {/* 网络重试 */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <Wifi size={16} />
+          <div>
+            <h3>{t('settings.general.network')}</h3>
+            <p>{t('settings.general.networkHint')}</p>
+          </div>
+        </div>
+
+        <div className="form-field" style={{ marginTop: 12 }}>
+          <label className="form-label" htmlFor="max-retries-input">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <RefreshCw size={13} />
+              {t('settings.general.maxRetries')}
+            </span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <input
+              id="max-retries-input"
+              className="input-field"
+              type="number"
+              min={0}
+              max={99}
+              style={{ width: 90 }}
+              value={isUnlimited ? '' : (settings.maxRetries ?? 5)}
+              disabled={isUnlimited}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                saveSettings({ ...settings, maxRetries: Number.isFinite(v) ? Math.max(0, Math.min(99, v)) : 5 })
+              }}
+            />
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--app-color-text-soft)', fontSize: '0.8rem' }}>
+              <input
+                type="checkbox"
+                checked={isUnlimited}
+                onChange={(e) => saveSettings({ ...settings, maxRetries: e.target.checked ? -1 : 5 })}
+              />
+              {t('settings.general.retriesUnlimited')}
+            </label>
+          </div>
+          <p className="form-hint">{t('settings.general.maxRetriesHint')}</p>
+        </div>
       </section>
 
       {/* 工作目录 */}

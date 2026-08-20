@@ -203,18 +203,23 @@ export function setupIpc(win: BrowserWindow): void {
   })
 
   ipcMain.handle('settings:save', async (_e, settings: AppSettings) => {
+    const prev = db.getSettings()
     db.saveSettings(settings)
-    // 重新连接 MCP（失败不阻塞保存）
-    try {
-      await reconnectAllMcpServers(settings.mcpServers)
-    } catch (err) {
-      console.error('MCP reconnect error:', err)
+    // 仅当 mcpServers 实际变化时重连 MCP（设置为实时保存，不能每次击键都重连；重试机制下重连代价很高）
+    if (JSON.stringify(settings.mcpServers || []) !== JSON.stringify(prev.mcpServers || [])) {
+      try {
+        await reconnectAllMcpServers(settings.mcpServers)
+      } catch (err) {
+        console.error('MCP reconnect error:', err)
+      }
     }
-    // 重新加载 Skills（失败不阻塞保存）
-    try {
-      await reloadSkills(settings.skills)
-    } catch (err) {
-      console.error('Skills reload error:', err)
+    // 仅当 skills 实际变化时重新加载
+    if (JSON.stringify(settings.skills || []) !== JSON.stringify(prev.skills || [])) {
+      try {
+        await reloadSkills(settings.skills)
+      } catch (err) {
+        console.error('Skills reload error:', err)
+      }
     }
     return true
   })

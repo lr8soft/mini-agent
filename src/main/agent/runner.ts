@@ -33,6 +33,8 @@ export interface AgentEventCallbacks {
   onComplete?: () => void
   /** 出错 */
   onError?: (error: Error) => void
+  /** LLM 网络失败，正在自动重试 */
+  onRetry?: (failedAttempt: number, maxRetries: number, error: Error) => void
 }
 
 export interface AgentRunOptions {
@@ -110,7 +112,8 @@ export async function runAgent(
       signal
     }, {
       onToken: cb.onToken,
-      onError: cb.onError
+      onError: cb.onError,
+      onRetry: cb.onRetry
     })
 
     // 回传 token 用量

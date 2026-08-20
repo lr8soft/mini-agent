@@ -66,6 +66,8 @@ interface AppState {
   // Agent 状态
   isRunning: boolean
   streamingMessageId: string | null
+  /** LLM 网络重试状态（null = 未在重试）；maxRetries = -1 表示无限 */
+  retryStatus: { failedAttempt: number; maxRetries: number } | null
 
   // 模型选择 — 格式为 "providerId::modelName"，null 则用 active provider 默认模型
   selectedProviderModel: string | null
@@ -141,6 +143,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ---- Agent ----
   isRunning: false,
   streamingMessageId: null,
+  retryStatus: null,
 
   // ---- 模型选择 ----
   selectedProviderModel: null,
@@ -166,10 +169,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       timestamp: Date.now(),
       status: 'done'
     }
+    // 思考占位消息：发送后立即在聊天区显示"思考中 + 转圈动画"
+    const thinkingMsg: UIMessage = {
+      id: `thinking-${Date.now()}`,
+      sessionId: activeSessionId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      status: 'thinking'
+    }
     set((s) => ({
-      messages: [...s.messages, userMsg],
+      messages: [...s.messages, userMsg, thinkingMsg],
       isRunning: true,
-      streamingMessageId: null
+      streamingMessageId: null,
+      retryStatus: null
     }))
 
     try {
@@ -192,28 +205,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       if (result.error) {
         set((s) => ({
-          messages: [...s.messages, {
-            id: `err-${Date.now()}`,
-            sessionId: activeSessionId!,
-            role: 'assistant',
-            content: `Error: ${result.error}`,
-            timestamp: Date.now(),
-            status: 'error'
-          }],
-          isRunning: false
+          messages: [
+            ...s.messages.filter(m => m.status !== 'thinking'),
+            {
+              id: `err-${Date.now()}`,
+              sessionId: activeSessionId!,
+              role: 'assistant',
+              content: `Error: ${result.error}`,
+              timestamp: Date.now(),
+              status: 'error'
+            }
+          ],
+          isRunning: false,
+          retryStatus: null
         }))
       }
     } catch (err) {
       set((s) => ({
-        messages: [...s.messages, {
-          id: `err-${Date.now()}`,
-          sessionId: activeSessionId!,
-          role: 'assistant',
-          content: `Error: ${(err as Error).message}`,
-          timestamp: Date.now(),
-          status: 'error'
-        }],
-        isRunning: false
+        messages: [
+          ...s.messages.filter(m => m.status !== 'thinking'),
+          {
+            id: `err-${Date.now()}`,
+            sessionId: activeSessionId!,
+            role: 'assistant',
+            content: `Error: ${(err as Error).message}`,
+            timestamp: Date.now(),
+            status: 'error'
+          }
+        ],
+        isRunning: false,
+        retryStatus: null
       }))
     }
   },

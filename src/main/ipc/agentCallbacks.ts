@@ -102,6 +102,9 @@ export function buildAgentCallbacks(
         })
       }
       sender.send('agent:error', { sessionId, error: error.message })
+    },
+    onRetry: (failedAttempt, maxRetries) => {
+      sender.send('agent:retry', { sessionId, failedAttempt, maxRetries })
     }
   }
 
