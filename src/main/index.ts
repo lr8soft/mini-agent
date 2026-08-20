@@ -22,6 +22,9 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     title: 'MiniAgent',
     backgroundColor: '#f5f6f8',
+    icon: is.dev
+      ? path.join(__dirname, '../../src/renderer/public/logo.png')
+      : path.join(__dirname, '../renderer/logo.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       sandbox: false,

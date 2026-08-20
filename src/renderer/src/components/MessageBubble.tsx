@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { Bot, ChevronDown, ChevronUp, Terminal, Wrench, XCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Terminal, Wrench, XCircle } from 'lucide-react'
 import type { UIMessage, ToolCall } from '@shared/types'
 
 interface Props {
@@ -32,7 +32,7 @@ export default function MessageBubble({ message, toolStatuses }: Props) {
     <div className="message-assistant">
       {/* 头部 */}
       <div className="assistant-head">
-        <span className="assistant-name"><Bot size={14} />{t('app.name')}</span>
+        <span className="assistant-name"><img className="assistant-logo" src="./logo.png" alt="" />{t('app.name')}</span>
         {message.status === 'streaming' && <span className="pulse-dot" />}
         {message.status === 'error' && (
           <span className="assistant-status error">{t('message.error')}</span>

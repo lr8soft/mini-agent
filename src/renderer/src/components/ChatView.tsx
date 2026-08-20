@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, FolderOpen, Send, ShieldCheck, ShieldOff, Square } from 'lucide-react'
+import { FolderOpen, Send, ShieldCheck, ShieldOff, Square } from 'lucide-react'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
 
@@ -75,7 +75,7 @@ export default function ChatView() {
       <div className="chat-view">
         <div className="chat-messages" style={{ flex: 1 }}>
           <div className="chat-empty">
-            <span className="empty-mark"><Bot size={26} /></span>
+            <img className="empty-mark" src="./logo.png" alt="" />
             <h2>{t('app.name')}</h2>
             <p>{t('chat.createSessionToStart')}</p>
             <button className="btn-primary" style={{ marginTop: 16 }} onClick={() => useAppStore.getState().createSession()}>
@@ -133,7 +133,7 @@ export default function ChatView() {
         <div className="chat-inner">
           {messages.length === 0 && (
             <div className="chat-empty">
-              <span className="empty-mark"><Bot size={26} /></span>
+              <img className="empty-mark" src="./logo.png" alt="" />
               <h2>{t('app.name')}</h2>
               <p>{t('chat.welcome')}</p>
               <small>{t('chat.welcomeHint')}</small>

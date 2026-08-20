@@ -91,10 +91,11 @@
       }
     ],
     "win": {
+      "icon": "src/renderer/public/logo.png",
       "target": [
         "nsis"
       ],
-      "signAndEditExecutable": false
+      "signExecutable": false
     }
   }
 }

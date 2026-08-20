@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Bot, MessageSquare, Plus, Settings2, Trash2 } from 'lucide-react'
+import { MessageSquare, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useAppStore } from '../store'
 
 export default function Sidebar() {
@@ -10,7 +10,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* 品牌 */}
       <div className="brand">
-        <span className="brand-mark"><Bot size={19} /></span>
+        <img className="brand-mark" src="./logo.png" alt="" />
         <strong>{t('app.name')}</strong>
       </div>
 

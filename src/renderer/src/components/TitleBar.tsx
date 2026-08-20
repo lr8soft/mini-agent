@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Copy, Minus, Square, X } from 'lucide-react'
+import { Copy, Minus, Square, X } from 'lucide-react'
 
 /**
  * 自定义窗口标题栏（无边框窗口）
@@ -18,7 +18,7 @@ export default function TitleBar() {
   return (
     <header className="window-titlebar">
       <div className="window-identity">
-        <span className="titlebar-icon"><Bot size={13} /></span>
+        <img className="titlebar-icon" src="./logo.png" alt="" />
         <span>{t('app.name')}</span>
       </div>
       <div className="window-drag-space" />
