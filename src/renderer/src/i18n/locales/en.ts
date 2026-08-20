@@ -25,6 +25,7 @@ export default {
     approveManualHint: 'safe auto-pass, normal + dangerous require confirmation',
     approveAutoHint: 'safe + normal auto-pass, only dangerous requires confirmation',
     approveFullHint: 'All tool calls auto-pass, no confirmation dialogs',
+    compactNotice: 'Context compacted: {{before}} → {{after}} tokens ({{compressed}} early messages merged, kept {{kept}} recent)',
     thinking: 'Thinking...',
     retrying: 'Network unstable, retrying ({{attempt}}/{{max}})…',
     stop: 'Stop',

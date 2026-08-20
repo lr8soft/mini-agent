@@ -92,6 +92,9 @@ interface AppState {
   // 权限
   permissionRequest: PermissionRequest | null
 
+  // 上下文压缩通知（显示后自动消失）
+  compactNotice: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number } | null
+
   // 设置
   settings: AppSettings
   loadSettings: () => Promise<void>
@@ -278,6 +281,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---- 权限 ----
   permissionRequest: null,
+
+  // ---- 上下文压缩通知 ----
+  compactNotice: null,
 
   // ---- 设置 ----
   settings: {

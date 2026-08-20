@@ -25,6 +25,7 @@ export default {
     approveManualHint: 'safe は自動通過、normal + dangerous は確認が必要',
     approveAutoHint: 'safe + normal は自動通過、dangerous のみ確認が必要',
     approveFullHint: '全ツール呼び出しが自動通過、確認ダイアログなし',
+    compactNotice: 'コンテキストを圧縮しました：{{before}} → {{after}} tokens（早期{{compressed}}件を統合、直近{{kept}}件を保持）',
     thinking: '考え中...',
     retrying: 'ネットワークが不安定です。再試行中（{{attempt}}/{{max}}）…',
     stop: '停止',

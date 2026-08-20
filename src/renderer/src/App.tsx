@@ -152,6 +152,16 @@ export default function App() {
         useAppStore.setState({ permissionRequest: { permId, sessionId, toolName, args, level } })
       }),
 
+      // 上下文压缩通知
+      window.api.agent.onCompact(({ sessionId, beforeTokens, afterTokens, compressedCount, keptCount }) => {
+        if (sessionId !== useAppStore.getState().activeSessionId) return
+        useAppStore.setState({ compactNotice: { beforeTokens, afterTokens, compressedCount, keptCount } })
+        // 8 秒后自动消失
+        setTimeout(() => {
+          useAppStore.setState({ compactNotice: null })
+        }, 8000)
+      }),
+
       // 标题更新
       window.api.onLog(() => {}), // 静默消费日志
 

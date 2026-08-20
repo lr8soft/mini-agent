@@ -146,11 +146,12 @@ export const bashTool: ToolHandler = {
     type: 'function',
     function: {
       name: 'bash',
-      description: '执行 shell 命令。默认超时 120 秒。',
+      description: '执行 shell 命令。默认工作目录为项目根目录，可通过 workdir 参数指定子目录。返回 stdout、stderr 和 exit code。',
       parameters: {
         type: 'object',
         properties: {
-          command: { type: 'string', description: '要执行的命令' },
+          command: { type: 'string', description: '要执行的命令（无需 cd，工作目录由 workdir 控制）' },
+          workdir: { type: 'string', description: '工作目录（相对或绝对路径），默认为项目根目录' },
           timeout: { type: 'number', description: '超时秒数，默认120' }
         },
         required: ['command']
@@ -161,21 +162,31 @@ export const bashTool: ToolHandler = {
   async execute(args, ctx) {
     const command = args.command as string
     const timeout = ((args.timeout as number) || 120) * 1000
-    const resolvedCmd = `cd "${ctx.workspacePath}" && ${command}`
+    const workdir = args.workdir
+      ? (path.isAbsolute(args.workdir as string)
+          ? args.workdir as string
+          : path.join(ctx.workspacePath, args.workdir as string))
+      : ctx.workspacePath
 
     return new Promise((resolve) => {
-      exec(resolvedCmd, {
+      exec(command, {
         timeout,
         maxBuffer: 10 * 1024 * 1024,
-        cwd: ctx.workspacePath,
+        cwd: workdir,
         shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/bash'
       }, (err, stdout, stderr) => {
-        let result = ''
-        if (stdout) result += stdout
-        if (stderr) result += (result ? '\n' : '') + stderr
-        if (err && err.killed) result += (result ? '\n' : '') + 'Process timed out'
-        if (!result.trim()) result = '(no output)'
-        resolve(result)
+        const parts: string[] = []
+        if (stdout && stdout.trim()) parts.push(`[stdout]\n${stdout.trimEnd()}`)
+        if (stderr && stderr.trim()) parts.push(`[stderr]\n${stderr.trimEnd()}`)
+        if (err) {
+          const code = typeof err.code === 'number' ? err.code : -1
+          parts.push(`[exit code: ${code}]`)
+          if (err.killed) parts.push('[Process timed out]')
+        } else {
+          parts.push('[exit code: 0]')
+        }
+        if (parts.length === 0) parts.push('(no output)')
+        resolve(parts.join('\n'))
       })
     })
   }

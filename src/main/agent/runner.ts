@@ -48,6 +48,8 @@ export interface AgentEventCallbacks {
   onError?: (error: Error) => void
   /** LLM 网络失败，正在自动重试 */
   onRetry?: (failedAttempt: number, maxRetries: number, error: Error) => void
+  /** 上下文压缩完成（通知前端展示提示） */
+  onCompact?: (info: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number }) => void
 }
 
 export interface AgentRunOptions {
@@ -105,7 +107,10 @@ export async function runAgent(
   // Auto Compact: 发送前检查上下文是否超阈值
   if (needsCompact(workingMessages, contextWindow)) {
     log('info', 'Auto compact triggered before sending')
-    const compacted = await autoCompact(workingMessages, provider, modelOverride)
+    const { messages: compacted, info } = await autoCompact(workingMessages, provider, modelOverride)
+    if (info.compressedCount > 0) {
+      cb.onCompact?.(info)
+    }
     workingMessages.length = 0
     workingMessages.push(...compacted)
   }
@@ -126,7 +131,10 @@ export async function runAgent(
     // 每轮发送前也检查（工具结果可能很大，导致上下文膨胀）
     if (round > 1 && needsCompact(workingMessages, contextWindow)) {
       log('info', `Auto compact triggered at round ${round}`)
-      const compacted = await autoCompact(workingMessages, provider, modelOverride)
+      const { messages: compacted, info } = await autoCompact(workingMessages, provider, modelOverride)
+      if (info.compressedCount > 0) {
+        cb.onCompact?.(info)
+      }
       workingMessages.length = 0
       workingMessages.push(...compacted)
     }

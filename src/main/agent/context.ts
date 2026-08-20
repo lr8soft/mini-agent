@@ -202,6 +202,12 @@ export function needsCompact(
   return used >= threshold
 }
 
+/** autoCompact 返回值：压缩后的消息 + 压缩详情（用于通知前端） */
+export interface CompactResult {
+  messages: ChatMessage[]
+  info: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number }
+}
+
 /**
  * 执行 auto compact：将早期消息压缩为摘要，保留最近 N 条
  */
@@ -209,7 +215,7 @@ export async function autoCompact(
   messages: ChatMessage[],
   provider: ProviderConfig,
   modelOverride?: string
-): Promise<ChatMessage[]> {
+): Promise<CompactResult> {
   // 分离 system 消息和对话消息
   const systemMsgs: ChatMessage[] = []
   const conversationMsgs: ChatMessage[] = []
@@ -223,7 +229,7 @@ export async function autoCompact(
 
   if (conversationMsgs.length <= KEEP_RECENT_COUNT + 2) {
     log('info', 'Auto compact: not enough messages to compress')
-    return messages
+    return { messages, info: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: conversationMsgs.length } }
   }
 
   // 安全切分：切点不会落在 assistant(tool_calls) 与其 tool 结果之间，
@@ -231,7 +237,7 @@ export async function autoCompact(
   const { toCompress, toKeep } = planCompact(conversationMsgs, KEEP_RECENT_COUNT)
   if (toCompress.length === 0) {
     log('info', 'Auto compact: no safe boundary to split, skipping')
-    return messages
+    return { messages, info: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: conversationMsgs.length } }
   }
 
   log('info', `Auto compact: compressing ${toCompress.length} messages, keeping ${toKeep.length} recent`)
@@ -284,11 +290,17 @@ export async function autoCompact(
     const afterTokens = estimateTokens(compactedMessages)
     log('info', `Auto compact: ${beforeTokens} → ${afterTokens} tokens (saved ${beforeTokens - afterTokens})`)
 
-    return compactedMessages
+    return {
+      messages: compactedMessages,
+      info: { beforeTokens, afterTokens, compressedCount: toCompress.length, keptCount: toKeep.length }
+    }
   } catch (err) {
     log('error', `Auto compact failed: ${(err as Error).message}`)
     const fallback: ChatMessage[] = [...systemMsgs, ...toKeep]
     log('warn', 'Auto compact: falling back to simple truncation')
-    return fallback
+    return {
+      messages: fallback,
+      info: { beforeTokens: estimateTokens([...systemMsgs, ...conversationMsgs]), afterTokens: estimateTokens(fallback), compressedCount: toCompress.length, keptCount: toKeep.length }
+    }
   }
 }

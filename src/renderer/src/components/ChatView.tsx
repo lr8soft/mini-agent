@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X } from 'lucide-react'
+import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X, MinusCircle } from 'lucide-react'
 import { processImageFile, ImageAttachmentError, MAX_IMAGES } from '../utils/image'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
@@ -8,7 +8,7 @@ import type { AutoApproveMode } from '@shared/types'
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode } = useAppStore()
+  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, compactNotice } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -244,6 +244,21 @@ export default function ChatView() {
           )}
         </div>
       </div>
+
+      {/* 上下文压缩通知条 */}
+      {compactNotice && (
+        <div className="compact-notice">
+          <MinusCircle size={14} />
+          <span>
+            {t('chat.compactNotice', {
+              before: compactNotice.beforeTokens.toLocaleString(),
+              after: compactNotice.afterTokens.toLocaleString(),
+              compressed: compactNotice.compressedCount,
+              kept: compactNotice.keptCount
+            })}
+          </span>
+        </div>
+      )}
 
       {/* 消息流 */}
       <div ref={scrollRef} className="chat-messages">

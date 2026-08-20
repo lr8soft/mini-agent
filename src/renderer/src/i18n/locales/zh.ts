@@ -25,6 +25,7 @@ export default {
     approveManualHint: 'safe 自动放行，normal + dangerous 需弹窗确认',
     approveAutoHint: 'safe + normal 自动放行，仅 dangerous 需弹窗确认',
     approveFullHint: '全部工具调用自动放行，不弹窗',
+    compactNotice: '上下文已压缩：{{before}} → {{after}} tokens（合并 {{compressed}} 条早期消息，保留最近 {{kept}} 条）',
     thinking: '思考中...',
     retrying: '网络不稳定，正在重试（{{attempt}}/{{max}}）…',
     stop: '停止',

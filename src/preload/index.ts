@@ -97,6 +97,11 @@ const api = {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('agent:permission_request', handler)
       return () => ipcRenderer.removeListener('agent:permission_request', handler)
+    },
+    onCompact: (cb: (data: { sessionId: string; beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number }) => void) => {
+      const handler = (_e: any, data: any) => cb(data)
+      ipcRenderer.on('agent:compact', handler)
+      return () => ipcRenderer.removeListener('agent:compact', handler)
     }
   },
 

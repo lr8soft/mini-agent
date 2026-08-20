@@ -25,6 +25,7 @@ export default {
     approveManualHint: 'safe automatisch, normal + dangerous erfordern Bestätigung',
     approveAutoHint: 'safe + normal automatisch, nur dangerous erfordert Bestätigung',
     approveFullHint: 'Alle Tool-Aufrufe automatisch, keine Bestätigung',
+    compactNotice: 'Kontext komprimiert: {{before}} → {{after}} Tokens ({{compressed}} frühe Nachrichten zusammengefasst, {{kept}} letzte behalten)',
     thinking: 'Denke nach...',
     retrying: 'Netzwerk instabil, erneuter Versuch ({{attempt}}/{{max}})…',
     stop: 'Stopp',
