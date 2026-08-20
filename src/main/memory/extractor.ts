@@ -5,6 +5,7 @@
 import type { ChatMessage, ProviderConfig, MemoryCategory } from '../../shared/types'
 import { complete } from '../llm/provider'
 import { log } from '../llm/logger'
+import { extractTextContent } from '../../shared/multimodal'
 
 /** LLM 提取的单条记忆 */
 interface ExtractedMemory {
@@ -29,18 +30,18 @@ export async function extractMemories(
   sessionId: string
 ): Promise<ExtractedMemory[]> {
   // 过滤出有意义的对话内容（只取最近 20 条，避免过长）
+  // 多模态 content（用户图片消息）提取其文本部分参与记忆提取
   const dialogMessages = messages
     .filter(m => m.role === 'user' || m.role === 'assistant')
-    .filter((m): m is ChatMessage & { content: string } =>
-      typeof m.content === 'string' && m.content.trim().length > 0
-    )
+    .map(m => ({ role: m.role, text: extractTextContent(m.content).trim() }))
+    .filter(m => m.text.length > 0)
     .slice(-20)
 
   if (dialogMessages.length < 2) return []
 
   // 构建对话摘要文本
   const dialogText = dialogMessages
-    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content!.slice(0, 500)}`)
+    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text.slice(0, 500)}`)
     .join('\n\n')
 
   const extractPrompt = `You are a memory extraction assistant. Analyze the following conversation and extract any memorable information about the user's preferences, habits, working style, technical environment, or important facts.

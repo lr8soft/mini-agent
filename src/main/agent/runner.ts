@@ -10,6 +10,7 @@ import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
 import { buildSystemPrompt } from '../agent/promptBuilder'
 import { sanitizeHistory } from './history'
+import { extractTextContent } from '../../shared/multimodal'
 import { LoopDetector, DEFAULT_LOOP_CONFIG, type LoopDetectionConfig } from './loopDetector'
 import { getSettings } from '../store/db'
 
@@ -81,7 +82,7 @@ export async function runAgent(
 
   // 构建系统提示词（含记忆注入 + MCP 工具动态列表）
   const skillsPrompt = skillsPromptGetter ? skillsPromptGetter() : ''
-  const memoryPrompt = memoryEnabled ? buildMemoryPrompt(getLastUserMessage(messages)) : ''
+  const memoryPrompt = memoryEnabled ? buildMemoryPrompt(extractTextContent(getLastUserMessage(messages))) : ''
   const systemPrompt = buildSystemPrompt(workspacePath, skillsPrompt, memoryPrompt, opts.systemPromptExtra)
 
   // 清洗 abort/崩溃遗留的非法序列（孤儿 tool 结果、不完整的 tool_call 组），
@@ -354,14 +355,11 @@ async function finalizeRun(
   }
 }
 
-/** 从消息列表中获取最后一条 user 消息的 content（多模态时拼接 text 部分） */
-function getLastUserMessage(messages: ChatMessage[]): string {
+/** 从消息列表中获取最后一条 user 消息的 content（可能是字符串或多模态 ContentPart[]） */
+function getLastUserMessage(messages: ChatMessage[]): ChatMessage['content'] {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i]
-    if (msg.role === 'user' && msg.content) {
-      if (typeof msg.content === 'string') return msg.content
-      return msg.content.filter(p => p.type === 'text').map(p => p.text).join('\n')
-    }
+    if (msg.role === 'user' && msg.content) return msg.content
   }
-  return ''
+  return null
 }

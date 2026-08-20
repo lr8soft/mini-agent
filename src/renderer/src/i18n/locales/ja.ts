@@ -28,13 +28,19 @@ export default {
     stop: '停止',
     send: '送信',
     welcome: '下にメッセージを入力して会話を開始してください。',
-    welcomeHint: 'エージェントはファイルの読み取り、コマンドの実行、MCPツールの使用が可能です。',
+    welcomeHint: "Agent はファイル読み取り、コマンド実行、MCP ツール利用、画像の理解に対応しています。",
     inputPlaceholder: 'メッセージを送信... (Enter で送信、Shift+Enter で改行)',
     workspace: 'ワークスペース',
     changeWorkspace: '変更',
     defaultModel: '(デフォルトモデル)',
     selectModelHint: 'モデルを選択 (空 = プロバイダーのデフォルト)',
-    modelDefaultSuffix: '(デフォルト)'
+    modelDefaultSuffix: '(デフォルト)',
+    attachImage: "画像を追加（ペースト/ドラッグも可）",
+    removeImage: "画像を削除",
+    imageLimit: "1メッセージにつき最大 {{max}} 枚まで",
+    imageErrorUnsupported: "サポートされていないファイル形式です。画像ファイルを追加してください",
+    imageErrorTooLarge: "画像が 10MB を超えています。追加できません",
+    imageErrorDecode: "画像のデコードに失敗しました。別の画像をお試しください"
   },
   permission: {
     title: '権限リクエスト',

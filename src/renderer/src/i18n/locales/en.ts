@@ -28,13 +28,19 @@ export default {
     stop: 'Stop',
     send: 'Send',
     welcome: 'Type a message below to start a conversation.',
-    welcomeHint: 'The agent can read files, run commands, and use MCP tools.',
+    welcomeHint: "The agent can read files, run commands, use MCP tools, and understand images you send.",
     inputPlaceholder: 'Send a message... (Enter to send, Shift+Enter for newline)',
     workspace: 'Workspace',
     changeWorkspace: 'Change',
     defaultModel: '(Default Model)',
     selectModelHint: 'Select model (empty = provider default)',
-    modelDefaultSuffix: '(default)'
+    modelDefaultSuffix: '(default)',
+    attachImage: "Add images (or paste / drop)",
+    removeImage: "Remove image",
+    imageLimit: "Up to {{max}} images per message",
+    imageErrorUnsupported: "Unsupported file type, please add an image file",
+    imageErrorTooLarge: "Image exceeds 10MB and cannot be added",
+    imageErrorDecode: "Failed to decode image, please try another one"
   },
   permission: {
     title: 'Permission Request',

@@ -86,7 +86,7 @@ interface AppState {
   saveSettings: (s: AppSettings, returnToChat?: boolean) => Promise<void>
 
   // Agent 操作
-  sendMessage: (text: string) => Promise<void>
+  sendMessage: (text: string, images?: string[]) => Promise<void>
   abortAgent: () => void
   respondPermission: (allowed: boolean) => void
 }
@@ -153,7 +153,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   autoApprove: false,
   setAutoApprove: (v) => set({ autoApprove: v }),
 
-  sendMessage: async (text: string) => {
+  sendMessage: async (text: string, images?: string[]) => {
     let { activeSessionId } = get()
     if (!activeSessionId) {
       await get().createSession()
@@ -166,6 +166,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionId: activeSessionId,
       role: 'user',
       content: text,
+      images: images && images.length > 0 ? images : undefined,
       timestamp: Date.now(),
       status: 'done'
     }
@@ -198,7 +199,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
 
-      const result = await api.agent.run(activeSessionId, text, {
+      const result = await api.agent.run(activeSessionId, { text, images }, {
         providerId,
         modelOverride,
         autoApprove: get().autoApprove

@@ -3,7 +3,7 @@
 // 通过 contextBridge 暴露最小化 API surface
 // ============================================================
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, Session, UIMessage } from '../shared/types'
+import type { AppSettings, Session, UIMessage, UserMessageInput } from '../shared/types'
 
 const api = {
   // ============================================================
@@ -50,7 +50,7 @@ const api = {
   // ============================================================
   agent: {
     /** 发送消息并启动 agent 运行 */
-    run: (sessionId: string, message: string, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
+    run: (sessionId: string, message: UserMessageInput, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
       ipcRenderer.invoke('agent:run', sessionId, message, options),
     /** 中止当前运行 */
     abort: (sessionId: string): Promise<boolean> =>

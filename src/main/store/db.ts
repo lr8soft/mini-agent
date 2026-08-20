@@ -31,6 +31,7 @@ export function initDatabase(): void {
       tool_calls TEXT,
       tool_call_id TEXT,
       tool_name TEXT,
+      images TEXT,
       timestamp INTEGER NOT NULL,
       status TEXT,
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
@@ -76,6 +77,12 @@ export function initDatabase(): void {
   const columns = db!.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]
   if (!columns.some(c => c.name === 'workspace_path')) {
     db!.exec('ALTER TABLE sessions ADD COLUMN workspace_path TEXT')
+  }
+
+  // 迁移：给 messages 加 images 列（用户图片附件，JSON 数组）
+  const msgColumns = db!.prepare("PRAGMA table_info(messages)").all() as { name: string }[]
+  if (!msgColumns.some(c => c.name === 'images')) {
+    db!.exec('ALTER TABLE messages ADD COLUMN images TEXT')
   }
 }
 
@@ -151,12 +158,14 @@ export function touchSession(id: string): void {
 
 export function addMessage(msg: UIMessage): void {
   db!.prepare(`
-    INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, tool_name, timestamp, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, session_id, role, content, tool_calls, tool_call_id, tool_name, images, timestamp, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     msg.id, msg.sessionId, msg.role, msg.content,
     msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
-    msg.toolCallId, msg.toolName, msg.timestamp, msg.status || null
+    msg.toolCallId, msg.toolName,
+    msg.images && msg.images.length > 0 ? JSON.stringify(msg.images) : null,
+    msg.timestamp, msg.status || null
   )
   touchSession(msg.sessionId)
 }
@@ -169,6 +178,7 @@ export function getMessages(sessionId: string): UIMessage[] {
     role: r.role,
     content: r.content || '',
     toolCalls: r.tool_calls ? JSON.parse(r.tool_calls) : undefined,
+    images: r.images ? (safeJsonParse<string[]>(r.images) ?? undefined) : undefined,
     toolCallId: r.tool_call_id,
     toolName: r.tool_name,
     timestamp: r.timestamp,
@@ -222,6 +232,16 @@ function defaultSettings(): AppSettings {
     language: 'auto',
     maxRetries: 5,
     maxRounds: 20
+  }
+}
+
+/** 容错 JSON 解析（DB 中图片列为 JSON 数组；损坏时返回 null 而非抛异常） */
+function safeJsonParse<T>(raw: string): T | null {
+  try {
+    const v = JSON.parse(raw)
+    return (Array.isArray(v) ? v : null) as T
+  } catch {
+    return null
   }
 }
 

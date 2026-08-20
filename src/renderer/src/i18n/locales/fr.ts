@@ -28,13 +28,19 @@ export default {
     stop: 'Arrêter',
     send: 'Envoyer',
     welcome: 'Tapez un message ci-dessous pour commencer une conversation.',
-    welcomeHint: 'L\'agent peut lire des fichiers, exécuter des commandes et utiliser des outils MCP.',
+    welcomeHint: "L’agent peut lire des fichiers, exécuter des commandes, utiliser des outils MCP et comprendre les images.",
     inputPlaceholder: 'Envoyez un message... (Enter pour envoyer, Shift+Enter pour nouvelle ligne)',
     workspace: 'Workspace',
     changeWorkspace: 'Changer',
     defaultModel: '(Modèle par défaut)',
     selectModelHint: 'Sélectionner le modèle (vide = défaut du fournisseur)',
-    modelDefaultSuffix: '(par défaut)'
+    modelDefaultSuffix: '(par défaut)',
+    attachImage: "Ajouter des images (ou coller / glisser)",
+    removeImage: "Supprimer l’image",
+    imageLimit: "Maximum {{max}} images par message",
+    imageErrorUnsupported: "Type de fichier non pris en charge. Ajoutez un fichier image",
+    imageErrorTooLarge: "L’image dépasse 10 Mo et ne peut pas être ajoutée",
+    imageErrorDecode: "Échec de la décodification de l’image. Essayez-en une autre"
   },
   permission: {
     title: 'Demande de Permission',

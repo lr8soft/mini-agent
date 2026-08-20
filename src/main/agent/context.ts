@@ -2,6 +2,7 @@
 // 上下文管理 — Token 估算 + Auto Compact
 // 当上下文使用超过阈值时自动压缩对话历史
 // ============================================================
+import { extractTextContent } from '../../shared/multimodal'
 import type { ChatMessage, ProviderConfig } from '../../shared/types'
 import { complete } from '../llm/provider'
 import { log } from '../llm/logger'
@@ -241,10 +242,10 @@ export async function autoCompact(
     if (m.content) {
       if (Array.isArray(m.content)) {
         // 多模态 content：提取文本部分，图片标记为 [image]
-        for (const part of m.content) {
-          if (part.type === 'text') text += `: ${part.text}`
-          else if (part.type === 'image_url') text += ': [screenshot image]'
-        }
+        const imageCount = m.content.filter(part => part.type === 'image_url').length
+        const textPart = extractTextContent(m.content)
+        if (textPart) text += `: ${textPart}`
+        if (imageCount > 0) text += `: [${imageCount} image(s)]`
       } else {
         text += `: ${m.content}`
       }

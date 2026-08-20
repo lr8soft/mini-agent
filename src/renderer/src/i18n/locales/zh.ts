@@ -28,13 +28,19 @@ export default {
     stop: '停止',
     send: '发送',
     welcome: '在下方输入消息开始对话。',
-    welcomeHint: 'Agent 可以读取文件、运行命令、使用 MCP 工具。',
+    welcomeHint: "Agent 可以读取文件、运行命令、使用 MCP 工具，也能看懂你发的图片。",
     inputPlaceholder: '输入消息... (Enter 发送, Shift+Enter 换行)',
     workspace: '目录',
     changeWorkspace: '切换',
     defaultModel: '(默认模型)',
     selectModelHint: '选择模型（留空 = 使用 Provider 默认）',
-    modelDefaultSuffix: '(默认)'
+    modelDefaultSuffix: '(默认)',
+    attachImage: "添加图片（也可粘贴或拖入）",
+    removeImage: "移除图片",
+    imageLimit: "每条消息最多 {{max}} 张图片",
+    imageErrorUnsupported: "不支持的文件类型，请上传图片文件",
+    imageErrorTooLarge: "图片超过 10MB，无法添加",
+    imageErrorDecode: "图片解析失败，请更换图片"
   },
   permission: {
     title: '权限请求',

@@ -3,7 +3,8 @@
 // 所有来自渲染进程的请求在这里注册
 // ============================================================
 import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
-import type { AppSettings, ChatMessage } from '../../shared/types'
+import type { AppSettings, ChatMessage, UserMessageInput } from '../../shared/types'
+import { buildUserContent } from '../../shared/multimodal'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
 import { sanitizeHistory } from '../agent/history'
@@ -101,8 +102,10 @@ export function setupIpc(win: BrowserWindow): void {
   // ============================================================
   // Agent 对话
   // ============================================================
-  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: string, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }) => {
-    log('info', `agent:run — sessionId=${sessionId}, autoApprove=${options?.autoApprove}, providerId=${options?.providerId || '(active)'}, modelOverride=${options?.modelOverride || '(default)'}`)
+  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: UserMessageInput, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }) => {
+    // 只接受合法的 data URL 图片（渲染进程已过滤，这里二次防御）
+    const inputImages = (userMessage.images || []).filter(u => typeof u === 'string' && u.startsWith('data:image/'))
+    log('info', `agent:run — sessionId=${sessionId}, autoApprove=${options?.autoApprove}, providerId=${options?.providerId || '(active)'}, modelOverride=${options?.modelOverride || '(default)'}, images=${inputImages.length}`)
     const settings = db.getSettings()
     // 优先用 options.providerId（聊天页下拉框选择），否则用 settings.activeProviderId
     const providerId = options?.providerId || settings.activeProviderId
@@ -116,7 +119,8 @@ export function setupIpc(win: BrowserWindow): void {
       id: genId(),
       sessionId,
       role: 'user',
-      content: userMessage,
+      content: userMessage.text,
+      images: inputImages.length > 0 ? inputImages : undefined,
       timestamp: Date.now(),
       status: 'done'
     })
@@ -126,7 +130,10 @@ export function setupIpc(win: BrowserWindow): void {
     // 清洗 abort/崩溃遗留的非法序列（孤儿 tool 结果、不完整的 tool_call 组）
     const chatMessages: ChatMessage[] = sanitizeHistory(history.map(m => ({
       role: m.role,
-      content: m.content,
+      // 带图片的 user 消息组装为多模态 ContentPart[]（LLM 可见图片）
+      content: m.role === 'user' && m.images && m.images.length > 0
+        ? buildUserContent(m.content, m.images)
+        : m.content,
       tool_calls: m.toolCalls,
       tool_call_id: m.toolCallId,
       name: m.toolName

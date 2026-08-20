@@ -15,11 +15,18 @@ export default function MessageBubble({ message, toolStatuses }: Props) {
   const { t } = useTranslation()
   const retryStatus = useAppStore(s => s.retryStatus)
 
-  // 用户消息
+  // 用户消息（可含图片附件）
   if (message.role === 'user') {
     return (
       <div className="message-user">
-        <div className="bubble">{message.content}</div>
+        {message.images && message.images.length > 0 && (
+          <div className="message-user-images">
+            {message.images.map((src, i) => (
+              <img key={i} src={src} alt="" loading="lazy" />
+            ))}
+          </div>
+        )}
+        {message.content && <div className="bubble">{message.content}</div>}
       </div>
     )
   }

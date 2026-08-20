@@ -52,11 +52,19 @@ export interface UIMessage {
   sessionId: string
   role: Role
   content: string
+  /** 用户消息携带的图片（base64 data URL，如 "data:image/png;base64,..."）。仅 user 消息使用，DB 单独列持久化 */
+  images?: string[]
   toolCalls?: ToolCall[]
   toolCallId?: string
   toolName?: string
   timestamp: number
   status?: 'pending' | 'streaming' | 'done' | 'error' | 'thinking'
+}
+
+/** 渲染进程发起用户消息的输入（文本 + 可选图片附件） */
+export interface UserMessageInput {
+  text: string
+  images?: string[]
 }
 
 /** 会话 */

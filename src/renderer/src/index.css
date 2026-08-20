@@ -170,6 +170,24 @@ h1, h2, h3, p { margin: 0; }
   border-radius: var(--app-radius-md) var(--app-radius-md) 2px var(--app-radius-md);
   background: var(--app-color-primary-soft); font-size: 0.933rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
 }
+
+/* 用户消息图片附件 */
+.message-user { align-items: flex-start; }
+.message-user-images { display: flex; flex-wrap: wrap; gap: 6px; max-width: 85%; justify-content: flex-end; }
+.message-user-images img { max-width: 220px; max-height: 220px; border: 1px solid var(--app-color-border); border-radius: 8px; }
+.message-user .message-user-images + .bubble { margin-top: 6px; }
+
+/* 输入区图片附件 */
+.attach-button { width: 42px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; color: var(--app-color-text-soft); border: 1px solid var(--app-color-border); border-radius: 6px; background: var(--app-color-surface); cursor: pointer; }
+.attach-button:hover:not(:disabled) { color: var(--app-color-primary-strong); border-color: var(--app-color-primary); }
+.attach-button:disabled { opacity: .45; cursor: not-allowed; }
+.attach-file-input { display: none; }
+.chat-image-previews { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.chat-image-preview { position: relative; display: inline-block; }
+.chat-image-preview img { width: 64px; height: 64px; object-fit: cover; border: 1px solid var(--app-color-border); border-radius: 6px; background: var(--app-color-surface); }
+.chat-image-remove { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; display: grid; place-items: center; color: #fff; border: 2px solid var(--app-color-bg); border-radius: 50%; background: var(--app-color-danger); cursor: pointer; }
+.chat-image-remove:hover { background: #c42b1c; }
+.chat-image-error { margin: 0 0 8px; color: var(--app-color-danger); font-size: 0.733rem; }
 .message-assistant { min-width: 0; }
 .assistant-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .assistant-name { display: flex; align-items: center; gap: 6px; color: var(--app-color-primary-strong); font-size: 0.8rem; font-weight: 650; }

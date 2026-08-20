@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, Send, ShieldCheck, ShieldOff, Square } from 'lucide-react'
+import { FolderOpen, ImagePlus, Send, ShieldCheck, ShieldOff, Square, X } from 'lucide-react'
+import { processImageFile, ImageAttachmentError, MAX_IMAGES } from '../utils/image'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
 
@@ -10,6 +11,10 @@ export default function ChatView() {
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // 待发送的图片附件（base64 data URL，发送前暂存在输入区预览）
+  const [pendingImages, setPendingImages] = useState<string[]>([])
+  const [imageError, setImageError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 当前 session 的工作目录
   const activeSession = sessions.find(s => s.id === activeSessionId)
@@ -44,11 +49,72 @@ export default function ChatView() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  // 切换会话时清空未发送的附件（它们不属于新会话）
+  useEffect(() => {
+    setPendingImages([])
+    setImageError(null)
+  }, [activeSessionId])
+
   const handleSubmit = () => {
     const text = input.trim()
-    if (!text || isRunning) return
-    sendMessage(text)
+    if ((!text && pendingImages.length === 0) || isRunning) return
+    sendMessage(text, pendingImages.length > 0 ? [...pendingImages] : undefined)
     setInput('')
+    setPendingImages([])
+    setImageError(null)
+  }
+
+  /** 添加图片附件（粘贴 / 拖放 / 文件选择，统一入口；内部做类型、大小、缩放校验） */
+  const addImages = async (files: File[]) => {
+    if (isRunning) return
+    const room = MAX_IMAGES - pendingImages.length
+    if (room <= 0) {
+      setImageError(t('chat.imageLimit', { max: MAX_IMAGES }))
+      return
+    }
+    setImageError(null)
+    const processed: string[] = []
+    for (const file of files.slice(0, room)) {
+      try {
+        processed.push(await processImageFile(file))
+      } catch (err) {
+        const code = err instanceof ImageAttachmentError ? err.code : 'decode-failed'
+        const errorKey = {
+          'unsupported-type': 'chat.imageErrorUnsupported',
+          'too-large': 'chat.imageErrorTooLarge',
+          'decode-failed': 'chat.imageErrorDecode'
+        }[code]
+        setImageError(t(errorKey))
+        break
+      }
+    }
+    if (processed.length > 0) {
+      setPendingImages(prev => [...prev, ...processed])
+    }
+  }
+
+  /** 粘贴图片（如截图） */
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (isRunning) return
+    const files: File[] = []
+    for (const item of Array.from(e.clipboardData.items)) {
+      if (item.type.startsWith('image/')) {
+        const f = item.getAsFile()
+        if (f) files.push(f)
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault()
+      void addImages(files)
+    }
+  }
+
+  /** 拖放图片 */
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (isRunning) return
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) void addImages(files)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -154,12 +220,50 @@ export default function ChatView() {
 
       {/* 输入区 */}
       <div className="chat-input-area">
-        <div className="chat-input-row">
+        {/* 图片附件预览 */}
+        {pendingImages.length > 0 && (
+          <div className="chat-image-previews">
+            {pendingImages.map((src, i) => (
+              <span key={i} className="chat-image-preview">
+                <img src={src} alt="" />
+                <button
+                  className="chat-image-remove"
+                  title={t('chat.removeImage')}
+                  onClick={() => setPendingImages(prev => prev.filter((_, j) => j !== i))}
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {imageError && <p className="chat-image-error">{imageError}</p>}
+        <div className="chat-input-row" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
+          <button
+            className="attach-button"
+            title={t('chat.attachImage')}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isRunning || pendingImages.length >= MAX_IMAGES}
+          >
+            <ImagePlus size={16} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="attach-file-input"
+            onChange={(e) => {
+              if (e.target.files) void addImages(Array.from(e.target.files))
+              e.target.value = ''
+            }}
+          />
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={t('chat.inputPlaceholder')}
             className="chat-textarea"
             rows={1}
@@ -184,7 +288,7 @@ export default function ChatView() {
           <button
             className="send-button"
             onClick={handleSubmit}
-            disabled={!input.trim() || isRunning}
+            disabled={(!input.trim() && pendingImages.length === 0) || isRunning}
           >
             <Send size={15} />
             {t('chat.send')}
