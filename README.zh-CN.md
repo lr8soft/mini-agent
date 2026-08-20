@@ -1,4 +1,4 @@
-# Zhumora
+# Zhumora Agent
 
 <p align="center">
   <img src="https://img.shields.io/badge/Electron-43-47848F?logo=electron&logoColor=white" alt="Electron" />
