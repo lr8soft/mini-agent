@@ -103,7 +103,7 @@ h1, h2, h3, p { margin: 0; }
   background: transparent; cursor: pointer; text-align: left;
 }
 .session-nav button > svg { flex: 0 0 auto; color: var(--app-color-text-mute); }
-.session-nav button span { flex: 1; min-width: 0; overflow: hidden; font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
+.session-nav button .session-title { flex: 1 1 auto; min-width: 0; overflow: hidden; font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
 .session-nav button:hover { background: var(--app-muted-bg); }
 .session-nav button.active { background: var(--app-active-bg); }
 .session-nav button.active > svg { color: var(--app-color-primary-strong); }

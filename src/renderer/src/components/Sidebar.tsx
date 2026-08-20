@@ -32,7 +32,7 @@ export default function Sidebar() {
             onClick={() => setActiveSession(s.id)}
           >
             <MessageSquare size={15} />
-            <span>{s.title}</span>
+            <span className="session-title">{s.title}</span>
             <span
               className="session-delete"
               title={t('sidebar.deleteSession')}
