@@ -32,7 +32,7 @@
 ## 特性
 
 - **任意 LLM、任意端点** —— 支持所有 OpenAI 兼容 API（OpenAI、Ollama、vLLM、DeepSeek 等），无厂商锁定。
-- **ReAct 智能体循环** —— 完整的工具调用闭环：LLM → 工具调用 → 执行 → 结果回传 → 继续推理（单轮对话最多 20 次工具调用）。
+- **ReAct 智能体循环** —— 完整的工具调用闭环：LLM → 工具调用 → 执行 → 结果回传 → 继续推理（单轮对话最多 20 次工具轮次（可配置，0 = 不限制）；内置重复调用循环检测（3 次警告 / 5 次硬停），停止时自动输出纯文本收尾总结）。
 - **内置文件工具** —— `read` / `write` / `edit` / `bash` / `grep` / `glob` / `ls` / `set_title`，全部在本地执行。
 - **浏览器自动化** —— 内置无头 Chromium（Playwright 随安装包分发）：`browser_navigate` / `browser_click` / `browser_type` / `browser_screenshot` / `browser_get_text` / `browser_get_html` / `browser_wait` / `browser_close`。
 - **桌面自动化** —— 鼠标 / 键盘 / 屏幕控制（robotjs）：`desktop_mouse_move` / `desktop_mouse_click` / `desktop_mouse_drag` / `desktop_mouse_scroll` / `desktop_key_tap` / `desktop_type_text` / `desktop_screenshot` / `desktop_screen_size` / `desktop_get_mouse_pos` / `desktop_get_pixel_color`。

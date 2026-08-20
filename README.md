@@ -32,7 +32,7 @@
 ## Features
 
 - **Any LLM, Any Endpoint** — Connect to any OpenAI-compatible API (OpenAI, Ollama, vLLM, DeepSeek, etc.). No vendor lock-in.
-- **ReAct Agent Loop** — Full tool-calling loop: LLM → tool calls → execute → feed results back → continue (up to 20 tool rounds per conversation).
+- **ReAct Agent Loop** — Full tool-calling loop: LLM → tool calls → execute → feed results back → continue (up to 20 tool rounds per conversation, configurable, with repeated-call loop detection and an automatic text-only summary when stopped).
 - **Built-in File Tools** — `read` / `write` / `edit` / `bash` / `grep` / `glob` / `ls` / `set_title`, all running locally.
 - **Browser Automation** — Bundled headless Chromium (Playwright ships with the installer): `browser_navigate` / `browser_click` / `browser_type` / `browser_screenshot` / `browser_get_text` / `browser_get_html` / `browser_wait` / `browser_close`.
 - **Desktop Automation** — Mouse / keyboard / screen control (robotjs): `desktop_mouse_move` / `desktop_mouse_click` / `desktop_mouse_drag` / `desktop_mouse_scroll` / `desktop_key_tap` / `desktop_type_text` / `desktop_screenshot` / `desktop_screen_size` / `desktop_get_mouse_pos` / `desktop_get_pixel_color`.

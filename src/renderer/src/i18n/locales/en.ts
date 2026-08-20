@@ -147,7 +147,12 @@ export default {
       networkHint: 'Automatic retry policy for failed LLM requests and MCP connections.',
       maxRetries: 'Retries',
       maxRetriesHint: 'How many times to retry after a request fails. 0 = no retry. Delay grows from 1s up to 30s.',
-      retriesUnlimited: 'Unlimited retries'
+      retriesUnlimited: 'Unlimited retries',
+      maxRounds: 'Max tool rounds',
+      maxRoundsHint: 'Max tool-call rounds per conversation (default 20). When reached, the agent stops and writes a text-only summary. 0 = unlimited (loop detection still applies).',
+      roundsUnlimited: 'Unlimited',
+      agent: 'Agent Behavior',
+      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.'
     },
     usage: {
       hint: 'Token usage statistics. Input/output tokens are recorded for each LLM call automatically.',

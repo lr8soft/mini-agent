@@ -147,7 +147,12 @@ export default {
       networkHint: 'LLM 请求与 MCP 连接失败时的自动重试策略。',
       maxRetries: '重试次数',
       maxRetriesHint: '请求失败后的重试次数，0 = 不重试。重试间隔递增（1s 起，最长 30s）。',
-      retriesUnlimited: '无限重试'
+      retriesUnlimited: '无限重试',
+      maxRounds: '最大工具轮数',
+      maxRoundsHint: '单次对话最多允许多少轮工具调用（默认 20）。达到后 Agent 强制停止并输出纯文本收尾总结。0 = 不限制（循环检测仍然生效）。',
+      roundsUnlimited: '不限制',
+      agent: 'Agent 行为',
+      agentHint: '工具调用循环的安全网：重复相同调用会被警告/硬停，轮数达到上限后自动收尾。',
     },
     usage: {
       hint: 'Token 用量统计。每次 LLM 调用的 input/output tokens 自动记录。',

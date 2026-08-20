@@ -147,7 +147,12 @@ export default {
       networkHint: "Nouvelle tentative automatique en cas d'échec des requêtes LLM et des connexions MCP.",
       maxRetries: 'Nouvelles tentatives',
       maxRetriesHint: "Nombre de tentatives après un échec. 0 = aucune tentative. L'attente passe de 1 s à 30 s maximum.",
-      retriesUnlimited: 'Tentatives illimitées'
+      retriesUnlimited: 'Tentatives illimitées',
+      maxRounds: 'Max tool rounds',
+      maxRoundsHint: 'Max tool-call rounds per conversation (default 20). When reached, the agent stops and writes a text-only summary. 0 = unlimited (loop detection still applies).',
+      roundsUnlimited: 'Unlimited',
+      agent: 'Agent Behavior',
+      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.'
     },
     usage: {
       hint: 'Statistiques d\'utilisation des tokens. Les tokens input/output sont enregistrés automatiquement pour chaque appel LLM.',

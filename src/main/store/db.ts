@@ -220,7 +220,8 @@ function defaultSettings(): AppSettings {
     workspacePath: app.getPath('home'),
     memoryEnabled: true,
     language: 'auto',
-    maxRetries: 5
+    maxRetries: 5,
+    maxRounds: 20
   }
 }
 

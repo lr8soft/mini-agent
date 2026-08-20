@@ -147,7 +147,12 @@ export default {
       networkHint: 'LLM リクエストと MCP 接続の失敗時の自動再試行設定。',
       maxRetries: '再試行数',
       maxRetriesHint: 'リクエスト失敗後の再試行数。0 = 再試行しない。間隔は 1 秒から最大 30 秒まで増加します。',
-      retriesUnlimited: '無限に再試行'
+      retriesUnlimited: '無限に再試行',
+      maxRounds: 'Max tool rounds',
+      maxRoundsHint: 'Max tool-call rounds per conversation (default 20). When reached, the agent stops and writes a text-only summary. 0 = unlimited (loop detection still applies).',
+      roundsUnlimited: 'Unlimited',
+      agent: 'Agent Behavior',
+      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.'
     },
     usage: {
       hint: 'トークン使用量統計。各LLM呼び出しのinput/outputトークンが自動記録されます。',

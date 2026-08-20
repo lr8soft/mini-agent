@@ -161,6 +161,7 @@ export function setupIpc(win: BrowserWindow): void {
           signal: abortController.signal,
           modelOverride: options?.modelOverride,
           memoryEnabled: settings.memoryEnabled !== false,
+          maxRounds: settings.maxRounds,
           onSessionTitleUpdate: (sid, title) => {
             mainWindow?.webContents.send('session:title_updated', { sessionId: sid, title })
           }

@@ -129,6 +129,8 @@ export interface AppSettings {
   language?: string
   /** LLM/MCP 网络请求失败的最大重试次数（-1 = 无限重试，0 = 不重试，默认 5） */
   maxRetries?: number
+  /** 单次对话最大工具轮数（0 = 不限制，默认 20）。达到后强制停止并生成纯文本收尾总结 */
+  maxRounds?: number
 }
 
 // ============================================================

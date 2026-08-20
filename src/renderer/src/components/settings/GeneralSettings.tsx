@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Check, FolderOpen, Globe, Monitor, Moon, RefreshCw, Sun, Type, Wifi } from 'lucide-react'
+import { Check, FolderOpen, Globe, Monitor, Moon, RefreshCw, Repeat, Sun, Type, Wifi, Workflow } from 'lucide-react'
 import { SUPPORTED_LANGUAGES, type AppLanguage, getEffectiveLanguage, storeLanguage } from '../../i18n'
 import { useAppStore, FONT_SIZE_OPTIONS, type Theme } from '../../store'
 
@@ -13,6 +13,7 @@ export function GeneralSettings() {
   const { t, i18n } = useTranslation()
   const { settings, saveSettings, theme, setTheme, fontSize, setFontSize } = useAppStore()
   const isUnlimited = (settings.maxRetries ?? 5) === -1
+  const isRoundsUnlimited = (settings.maxRounds ?? 20) === 0
 
   const pickDir = async () => {
     const dir = await window.api.settings.pickDirectory()
@@ -143,6 +144,51 @@ export function GeneralSettings() {
             </label>
           </div>
           <p className="form-hint">{t('settings.general.maxRetriesHint')}</p>
+        </div>
+      </section>
+
+      {/* Agent 行为 */}
+      <section className="settings-section">
+        <div className="settings-section-title">
+          <Repeat size={16} />
+          <div>
+            <h3>{t('settings.general.agent')}</h3>
+            <p>{t('settings.general.agentHint')}</p>
+          </div>
+        </div>
+
+        <div className="form-field" style={{ marginTop: 12 }}>
+          <label className="form-label" htmlFor="max-rounds-input">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Workflow size={13} />
+              {t('settings.general.maxRounds')}
+            </span>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <input
+              id="max-rounds-input"
+              className="input-field"
+              type="number"
+              min={1}
+              max={999}
+              style={{ width: 90 }}
+              value={isRoundsUnlimited ? '' : (settings.maxRounds ?? 20)}
+              disabled={isRoundsUnlimited}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10)
+                saveSettings({ ...settings, maxRounds: Number.isFinite(v) ? Math.max(1, Math.min(999, v)) : 20 })
+              }}
+            />
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--app-color-text-soft)', fontSize: '0.8rem' }}>
+              <input
+                type="checkbox"
+                checked={isRoundsUnlimited}
+                onChange={(e) => saveSettings({ ...settings, maxRounds: e.target.checked ? 0 : 20 })}
+              />
+              {t('settings.general.roundsUnlimited')}
+            </label>
+          </div>
+          <p className="form-hint">{t('settings.general.maxRoundsHint')}</p>
         </div>
       </section>
 

@@ -10,8 +10,19 @@ import { buildMemoryPrompt, captureMemories } from '../memory/manager'
 import { needsCompact, autoCompact, fetchContextWindow } from '../agent/context'
 import { buildSystemPrompt } from '../agent/promptBuilder'
 import { sanitizeHistory } from './history'
+import { LoopDetector, DEFAULT_LOOP_CONFIG, type LoopDetectionConfig } from './loopDetector'
+import { getSettings } from '../store/db'
 
-const MAX_TOOL_ROUNDS = 20      // 单次对话最大工具调用轮数，防止死循环
+export const DEFAULT_MAX_TOOL_ROUNDS = 20
+
+/** 单次对话最大工具轮数（0 = 不限制）。设置 maxRounds 可配，默认 20 */
+export function getMaxToolRounds(): number {
+  try {
+    const v = getSettings().maxRounds
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return Math.round(v)
+  } catch { /* DB 未初始化等场景 → 默认值 */ }
+  return DEFAULT_MAX_TOOL_ROUNDS
+}
 
 // Skill 提示词通过函数延迟获取，避免初始化顺序问题
 let skillsPromptGetter: (() => string) | null = null
@@ -51,6 +62,10 @@ export interface AgentRunOptions {
   modelOverride?: string
   /** 是否启用长期记忆（提取 + 注入） */
   memoryEnabled?: boolean
+  /** 最大工具轮数（0 = 不限制）；不传则读设置 maxRounds，默认 20 */
+  maxRounds?: number
+  /** 循环检测阈值（默认 soft=3 / hard=5） */
+  loopConfig?: LoopDetectionConfig
   /** 会话标题更新回调（由 IPC 层注入） */
   onSessionTitleUpdate?: (sessionId: string, title: string) => void
 }
@@ -94,10 +109,16 @@ export async function runAgent(
     workingMessages.push(...compacted)
   }
 
+  const maxRounds = opts.maxRounds ?? getMaxToolRounds()
+  const loopConfig = opts.loopConfig || DEFAULT_LOOP_CONFIG
+  const loopDetector = new LoopDetector()
+  /** 硬停原因（循环检测 / 达到轮数上限）；非 null 时本轮剩余工具跳过，循环结束后触发优雅收尾 */
+  let hardStop: string | null = null
+
   let round = 0
   const allAssistantMessages: ChatMessage[] = []
 
-  while (round < MAX_TOOL_ROUNDS) {
+  while (maxRounds <= 0 || round < maxRounds) {
     round++
     log('info', `Agent round ${round} — sending ${workingMessages.length} messages to LLM`)
 
@@ -155,6 +176,13 @@ export async function runAgent(
     for (const tc of toolCalls) {
       cb.onToolCall?.(tc)
 
+      // 循环检测：工具名 + 参数完全相同地连续调用
+      const verdict = loopDetector.inspect(tc.function.name, tc.function.arguments || '')
+      if (verdict.kind === 'hard' && !hardStop) {
+        hardStop = `Detected ${verdict.count} consecutive identical calls to "${tc.function.name}"`
+        log('warn', `Loop detected (hard): ${hardStop} — stopping to avoid a loop`)
+      }
+
       const toolEntry = getTool(tc.function.name)
       let resultText = ''
       let isError = false
@@ -171,6 +199,20 @@ export async function runAgent(
         } catch {
           resultText = `Error: Invalid JSON arguments: ${tc.function.arguments}`
           isError = true
+        }
+
+        if (!isError && hardStop) {
+          // 硬停已触发：本条及剩余工具调用不再执行（占位结果保证消息序列合法）
+          resultText = `Execution skipped: agent hard-stopped (${hardStop})`
+          isError = true
+          cb.onToolResult?.(tc.id, tc.function.name, resultText, true, 0)
+          workingMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            name: tc.function.name,
+            content: resultText
+          })
+          continue
         }
 
         if (!isError) {
@@ -200,6 +242,11 @@ export async function runAgent(
             resultText = await toolEntry.handler.execute(parsedArgs, ctx)
             durationMs = Date.now() - start
             log('info', `Tool ${tc.function.name} completed in ${durationMs}ms`)
+            // 循环检测软警告：追加提示引导模型换方法
+            if (verdict.kind === 'soft') {
+              log('warn', `Loop detected (soft): ${verdict.count} consecutive identical calls to ${tc.function.name}`)
+              resultText += `\n\n[Loop warning] This exact call to ${tc.function.name} has now been made ${verdict.count} times in a row. Stop repeating it — try a different approach or proceed to the next step.`
+            }
           } catch (err) {
             durationMs = Date.now() - start
             resultText = `Error: ${(err as Error).message}`
@@ -242,13 +289,69 @@ export async function runAgent(
     // 继续下一轮，让 LLM 看到工具结果后决定下一步
   }
 
-    log('warn', `Agent reached max rounds (${MAX_TOOL_ROUNDS}), stopping`)
-    cb.onComplete?.()
+  // 达到轮数上限（无循环硬停）→ 记录原因
+  if (!hardStop) {
+    hardStop = `Reached max tool rounds (${maxRounds})`
+    log('warn', `Agent reached max rounds (${maxRounds})`)
+  }
+
+  // 优雅收尾：不带 tools 的最后一次调用，强制模型纯文本总结进度
+  await finalizeRun(provider, modelOverride, signal, hardStop, workingMessages, allAssistantMessages, cb)
+
+  cb.onComplete?.()
   // 异步提取记忆（不阻塞返回）
   if (memoryEnabled && sessionId) {
     captureMemories(provider, workingMessages, sessionId).catch(() => {})
   }
   return allAssistantMessages
+}
+
+/**
+ * 停止时的优雅收尾（达到轮数上限 / 循环硬停）
+ * 追加一条收尾指令后发起一次不带 tools 的调用，强制模型纯文本输出：
+ * 已完成什么、剩下什么、关键文件路径。收尾调用失败不影响主流程。
+ */
+async function finalizeRun(
+  provider: ProviderConfig,
+  modelOverride: string | undefined,
+  signal: AbortSignal | undefined,
+  reason: string,
+  workingMessages: ChatMessage[],
+  allAssistantMessages: ChatMessage[],
+  cb: AgentEventCallbacks
+): Promise<void> {
+  const finalizeMessages: ChatMessage[] = [
+    ...workingMessages,
+    {
+      role: 'user',
+      content: `[System notice] The agent run has been stopped: ${reason}. You must now respond with text only — do NOT call any tools. In 1-3 short paragraphs, summarize: (1) what has been accomplished so far, (2) what remains to be done, (3) any important file paths or decisions. Be concrete and actionable so the user can continue in the next message.`
+    }
+  ]
+  try {
+    const model = modelOverride || provider.defaultModel
+    const { content, toolCalls, usage } = await streamChat(provider, {
+      messages: finalizeMessages,
+      tools: undefined,   // 无 tools → 强制纯文本
+      model,
+      temperature: provider.temperature,
+      reasoningEffort: provider.reasoningEnabled ? provider.reasoningEffort : undefined,
+      signal
+    }, {
+      onToken: cb.onToken,
+      // 收尾失败不覆盖主流程错误状态、不触发重试 UI
+      onError: undefined,
+      onRetry: undefined
+    })
+    if (usage) cb.onTokenUsage?.(usage, model)
+    // 理论上无 tools 不会产生 tool_calls；若个别模型仍返回，丢弃（不入库，避免悬空）
+    const msg: ChatMessage = { role: 'assistant', content: content || null }
+    workingMessages.push(msg)
+    allAssistantMessages.push(msg)
+    cb.onAssistantMessage?.(content, [])
+    log('info', 'Finalize summary completed')
+  } catch (err) {
+    log('error', `Finalize summary failed: {(err as Error).message}`)
+  }
 }
 
 /** 从消息列表中获取最后一条 user 消息的 content（多模态时拼接 text 部分） */

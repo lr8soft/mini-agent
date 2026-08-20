@@ -147,7 +147,12 @@ export default {
       networkHint: 'Automatische Wiederholung fehlgeschlagener LLM-Anfragen und MCP-Verbindungen.',
       maxRetries: 'Wiederholungen',
       maxRetriesHint: 'Wie oft eine fehlgeschlagene Anfrage erneut versucht wird. 0 = keine Wiederholung. Verzögerung steigt von 1 s bis 30 s.',
-      retriesUnlimited: 'Unbegrenzt wiederholen'
+      retriesUnlimited: 'Unbegrenzt wiederholen',
+      maxRounds: 'Max tool rounds',
+      maxRoundsHint: 'Max tool-call rounds per conversation (default 20). When reached, the agent stops and writes a text-only summary. 0 = unlimited (loop detection still applies).',
+      roundsUnlimited: 'Unlimited',
+      agent: 'Agent Behavior',
+      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.'
     },
     usage: {
       hint: 'Token-Nutzungsstatistiken. Input/Output-Tokens werden automatisch für jeden LLM-Aufruf erfasst.',

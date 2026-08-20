@@ -147,7 +147,12 @@ export default {
       networkHint: 'Reintento automático ante fallos en las peticiones LLM y las conexiones MCP.',
       maxRetries: 'Reintentos',
       maxRetriesHint: 'Cuántas veces reintentar una petición fallida. 0 = sin reintento. La espera crece de 1 s hasta 30 s.',
-      retriesUnlimited: 'Reintentos ilimitados'
+      retriesUnlimited: 'Reintentos ilimitados',
+      maxRounds: 'Max tool rounds',
+      maxRoundsHint: 'Max tool-call rounds per conversation (default 20). When reached, the agent stops and writes a text-only summary. 0 = unlimited (loop detection still applies).',
+      roundsUnlimited: 'Unlimited',
+      agent: 'Agent Behavior',
+      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.'
     },
     usage: {
       hint: 'Estadísticas de uso de tokens. Los tokens de entrada/salida se registran automáticamente para cada llamada LLM.',
