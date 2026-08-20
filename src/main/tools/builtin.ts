@@ -10,6 +10,11 @@ import type { ToolHandler, ToolContext } from './registry'
 import { updateSessionTitle } from '../store/db'
 import { log } from '../llm/logger'
 
+/** 行尾归一化：CRLF/CR → LF。read 显示与 edit 匹配共用此基准，消除 CRLF/LF 差异 */
+function toLF(t: string): string {
+  return t.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+}
+
 // 文本读取工具
 export const readTool: ToolHandler = {
   definition: {
@@ -37,7 +42,8 @@ export const readTool: ToolHandler = {
 
     try {
       const content = await fs.readFile(resolved, 'utf-8')
-      const lines = content.split('\n')
+      // 归一化为 LF 再分行显示，确保模型看到的文本与 edit 的匹配基准一致
+      const lines = toLF(content).split('\n')
       const start = Math.max(0, offset - 1)
       const end = Math.min(lines.length, start + limit)
       const result = lines.slice(start, end)
@@ -83,18 +89,18 @@ export const writeTool: ToolHandler = {
   }
 }
 
-// 文件编辑工具（精确替换）
+// 文件编辑工具（行尾无关的精确替换）
 export const editTool: ToolHandler = {
   definition: {
     type: 'function',
     function: {
       name: 'edit',
-      description: '编辑文件：找到 oldString 并替换为 newString。如果有多处匹配会失败。',
+      description: '编辑文件：找到 oldString 并替换为 newString。行尾自动对齐（CRLF/LF 均可匹配）。如果有多处匹配会失败，除非 replaceAll=true。',
       parameters: {
         type: 'object',
         properties: {
           file_path: { type: 'string', description: '文件绝对路径' },
-          oldString: { type: 'string', description: '要被替换的原始文本' },
+          oldString: { type: 'string', description: '要被替换的原始文本（直接照 read 输出复制即可，无需关心行尾）' },
           newString: { type: 'string', description: '替换后的文本' },
           replaceAll: { type: 'boolean', description: '是否替换所有匹配，默认false' }
         },
@@ -104,22 +110,29 @@ export const editTool: ToolHandler = {
   },
   permission: 'normal',
   async execute(args, ctx) {
-    const filePath = args.file_path as string
     const oldStr = args.oldString as string
     const newStr = args.newString as string
     const replaceAll = args.replaceAll as boolean
-    const resolved = path.isAbsolute(filePath) ? filePath : path.join(ctx.workspacePath, filePath)
+    const rawPath = args.file_path as string
+    const resolved = path.isAbsolute(rawPath) ? rawPath : path.join(ctx.workspacePath, rawPath)
 
     try {
       const content = await fs.readFile(resolved, 'utf-8')
-      const count = content.split(oldStr).length - 1
-      if (count === 0) return `Error: oldString not found in file`
-      if (count > 1 && !replaceAll) return `Error: ${count} matches found, set replaceAll=true or provide more context`
+      // 检测文件主导行尾，写回时保持一致，不破坏原文件风格
+      const eol = content.includes('\r\n') ? '\r\n' : '\n'
+      // 归一化为 LF 再匹配：模型给的 oldString 来自 read（恒为 LF），与文件 CRLF 不再冲突
+      const nContent = toLF(content)
+      const nOld = toLF(oldStr)
+      const nNew = toLF(newStr)
+      if (!nOld) return 'Error: oldString is empty'
 
-      const newContent = replaceAll
-        ? content.split(oldStr).join(newStr)
-        : content.replace(oldStr, newStr)
-      await fs.writeFile(resolved, newContent, 'utf-8')
+      const count = nContent.split(nOld).length - 1
+      if (count === 0) return 'Error: oldString not found in file. Line endings are auto-aligned (CRLF/LF); if it still fails, re-read the file and copy the exact text including indentation.'
+      if (count > 1 && !replaceAll) return `Error: ${count} matches found. Provide more surrounding context to make oldString unique, or set replaceAll=true.`
+
+      // 关键：用函数形式替换，规避 newString 中 "$&"、"$'"、"$$" 等被当作替换模式展开
+      const nResult = replaceAll ? nContent.split(nOld).join(nNew) : nContent.replace(nOld, () => nNew)
+      await fs.writeFile(resolved, nResult.split('\n').join(eol), 'utf-8')
       return `File edited: ${resolved} (${replaceAll ? count : 1} replacement(s))`
     } catch (err) {
       return `Error editing file: ${(err as Error).message}`
