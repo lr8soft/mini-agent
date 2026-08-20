@@ -28,6 +28,8 @@ export default {
     compactNotice: 'Contexto comprimido: {{before}} → {{after}} tokens ({{compressed}} mensajes antiguos fusionados, {{kept}} recientes conservados)',
     compactNow: 'Comprimir',
     compactNowHint: 'Fusiona los mensajes antiguos en un resumen para liberar espacio de contexto (no disponible mientras se ejecuta)',
+    compactWorking: 'Comprimiendo contexto...',
+    compactError: 'Error al comprimir',
     thinking: 'Pensando...',
     retrying: 'Red inestable, reintentando ({{attempt}}/{{max}})…',
     stop: 'Detener',
@@ -60,6 +62,9 @@ export default {
     error: 'Error',
     collapse: 'Colapsar',
     expand: 'Expandir'
+  },
+  compact: {
+    label: 'Resumen de contexto'
   },
   settings: {
     title: 'Configuración',

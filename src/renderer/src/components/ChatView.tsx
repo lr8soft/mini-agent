@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X, MinusCircle, Shrink } from 'lucide-react'
+import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X, MinusCircle, Shrink, XCircle } from 'lucide-react'
 import { processImageFile, ImageAttachmentError, MAX_IMAGES } from '../utils/image'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
@@ -8,7 +8,7 @@ import type { AutoApproveMode } from '@shared/types'
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, compactNotice, compactNow } = useAppStore()
+  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, compactNotice, isCompacting, compactNow } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -232,13 +232,17 @@ export default function ChatView() {
           </div>
           {/* 手动压缩上下文按钮（模仿 Cline：将早期消息合并为摘要，释放上下文空间） */}
           <button
-            className="compact-chip"
+            className={isCompacting ? 'compact-chip compacting' : 'compact-chip'}
             onClick={() => void compactNow()}
-            disabled={isRunning || messages.length < 10}
-            title={t('chat.compactNowHint')}
+            disabled={isRunning || isCompacting || messages.length < 10}
+            title={isCompacting ? t('chat.compactWorking') : t('chat.compactNowHint')}
           >
-            <Shrink size={13} />
-            {t('chat.compactNow')}
+            {isCompacting ? (
+              <span className="spinner" />
+            ) : (
+              <Shrink size={13} />
+            )}
+            {isCompacting ? t('chat.compactWorking') : t('chat.compactNow')}
           </button>
           {isRunning && (
             <>
@@ -255,17 +259,21 @@ export default function ChatView() {
         </div>
       </div>
 
-      {/* 上下文压缩通知条 */}
+      {/* 上下文压缩通知条（成功 / 失败） */}
       {compactNotice && (
-        <div className="compact-notice">
-          <MinusCircle size={14} />
+        <div className={`compact-notice ${compactNotice.error ? 'error' : ''}`}>
+          {compactNotice.error
+            ? <XCircle size={14} />
+            : <MinusCircle size={14} />}
           <span>
-            {t('chat.compactNotice', {
-              before: compactNotice.beforeTokens.toLocaleString(),
-              after: compactNotice.afterTokens.toLocaleString(),
-              compressed: compactNotice.compressedCount,
-              kept: compactNotice.keptCount
-            })}
+            {compactNotice.error
+              ? `${t('chat.compactError')}: ${compactNotice.error}`
+              : t('chat.compactNotice', {
+                  before: compactNotice.beforeTokens.toLocaleString(),
+                  after: compactNotice.afterTokens.toLocaleString(),
+                  compressed: compactNotice.compressedCount,
+                  kept: compactNotice.keptCount
+                })}
           </span>
         </div>
       )}

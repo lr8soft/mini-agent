@@ -4,6 +4,7 @@
 // ============================================================
 import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import type { AppSettings, ChatMessage, UserMessageInput, AutoApproveMode } from '../../shared/types'
+import { COMPACT_SUMMARY_PREFIX } from '../../shared/types'
 import { buildUserContent } from '../../shared/multimodal'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
@@ -256,7 +257,7 @@ export function setupIpc(win: BrowserWindow): void {
 
       // 重建会话历史：删除旧消息 → 写入摘要 + 保留的原始消息
       db.deleteMessages(sessionId)
-      const summaryMsg = compacted.find(m => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[Auto Compact Summary]'))
+      const summaryMsg = compacted.find(m => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(COMPACT_SUMMARY_PREFIX))
       if (summaryMsg && typeof summaryMsg.content === 'string') {
         db.addMessage({
           id: genId(),

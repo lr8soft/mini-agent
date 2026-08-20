@@ -61,6 +61,12 @@ export interface UIMessage {
   status?: 'pending' | 'streaming' | 'done' | 'error' | 'thinking'
 }
 
+/**
+ * 上下文压缩摘要消息的固定前缀（以 user 角色存库）。
+ * 渲染时据此识别并展示为可折叠的摘要块（而非普通用户气泡）。
+ */
+export const COMPACT_SUMMARY_PREFIX = '[Auto Compact Summary]'
+
 /** 渲染进程发起用户消息的输入（文本 + 可选图片附件） */
 export interface UserMessageInput {
   text: string

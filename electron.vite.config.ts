@@ -32,7 +32,10 @@ export default defineConfig({
       }
     },
     resolve: {
-      alias: { '@renderer': resolve(__dirname, 'src/renderer/src') }
+      alias: {
+        '@shared': resolve(__dirname, 'src/shared'),
+        '@renderer': resolve(__dirname, 'src/renderer/src')
+      }
     },
     plugins: [react()]
   }

@@ -4,6 +4,7 @@
 // ============================================================
 import { extractTextContent } from '../../shared/multimodal'
 import type { ChatMessage, ProviderConfig, UIMessage } from '../../shared/types'
+import { COMPACT_SUMMARY_PREFIX } from '../../shared/types'
 import { complete } from '../llm/provider'
 import { log } from '../llm/logger'
 import { planCompactByTokens } from './history'
@@ -341,7 +342,7 @@ export async function autoCompact(
       ...systemMsgs,
       {
         role: 'user',
-        content: `[Auto Compact Summary]\n${summary}`
+        content: `${COMPACT_SUMMARY_PREFIX}\n${summary}`
       },
       ...toKeep
     ]

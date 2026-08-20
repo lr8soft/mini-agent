@@ -28,6 +28,8 @@ export default {
     compactNotice: '上下文已压缩：{{before}} → {{after}} tokens（合并 {{compressed}} 条早期消息，保留最近 {{kept}} 条）',
     compactNow: '压缩上下文',
     compactNowHint: '将早期消息合并为摘要以释放上下文空间（会话运行中不可用）',
+    compactWorking: '正在压缩上下文...',
+    compactError: '压缩失败',
     thinking: '思考中...',
     retrying: '网络不稳定，正在重试（{{attempt}}/{{max}}）…',
     stop: '停止',
@@ -60,6 +62,9 @@ export default {
     error: '错误',
     collapse: '收起',
     expand: '展开'
+  },
+  compact: {
+    label: '上下文摘要'
   },
   settings: {
     title: '设置',

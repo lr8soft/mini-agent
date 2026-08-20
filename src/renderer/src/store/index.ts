@@ -93,7 +93,9 @@ interface AppState {
   permissionRequest: PermissionRequest | null
 
   // 上下文压缩通知（显示后自动消失）
-  compactNotice: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number } | null
+  compactNotice: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number; error?: string } | null
+  /** 手动压缩进行中（点击"压缩上下文"后为 true，完成/失败后为 false） */
+  isCompacting: boolean
 
   // 设置
   settings: AppSettings
@@ -282,16 +284,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   compactNow: async () => {
-    const { activeSessionId, isRunning } = get()
-    if (!activeSessionId || isRunning) return
-    const res = await api.agent.compactNow(activeSessionId)
-    if (res.error) {
-      console.error('Manual compact error:', res.error)
-      return
+    const { activeSessionId, isRunning, isCompacting } = get()
+    if (!activeSessionId || isRunning || isCompacting) return
+    set({ isCompacting: true })
+    try {
+      const res = await api.agent.compactNow(activeSessionId)
+      if (res.error) {
+        console.error('Manual compact error:', res.error)
+        // 失败提示：复用压缩通知条（红色错误态），几秒后自动消失
+        set({ compactNotice: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: 0, error: res.error } })
+        setTimeout(() => set({ compactNotice: null }), 6000)
+        return
+      }
+      // 主进程压缩成功后会广播 agent:compact → App.tsx 设置 compactNotice 展示提示
+      // 这里刷新消息列表：早期消息已被摘要替换
+      await get().loadMessages(activeSessionId)
+    } finally {
+      set({ isCompacting: false })
     }
-    // 主进程压缩成功后会广播 agent:compact → App.tsx 设置 compactNotice 展示提示
-    // 这里刷新消息列表：早期消息已被摘要替换
-    await get().loadMessages(activeSessionId)
   },
 
   // ---- 权限 ----
@@ -299,6 +309,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // ---- 上下文压缩通知 ----
   compactNotice: null,
+  isCompacting: false,
 
   // ---- 设置 ----
   settings: {

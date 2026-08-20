@@ -28,6 +28,8 @@ export default {
     compactNotice: 'Context compacted: {{before}} → {{after}} tokens ({{compressed}} early messages merged, kept {{kept}} recent)',
     compactNow: 'Compress',
     compactNowHint: 'Merge early messages into a summary to free up context space (unavailable while running)',
+    compactWorking: 'Compacting context...',
+    compactError: 'Compact failed',
     thinking: 'Thinking...',
     retrying: 'Network unstable, retrying ({{attempt}}/{{max}})…',
     stop: 'Stop',
@@ -60,6 +62,9 @@ export default {
     error: 'Error',
     collapse: 'Collapse',
     expand: 'Expand'
+  },
+  compact: {
+    label: 'Context Summary'
   },
   settings: {
     title: 'Settings',

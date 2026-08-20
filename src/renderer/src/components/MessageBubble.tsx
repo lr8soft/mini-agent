@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { ChevronDown, ChevronUp, Terminal, Wrench, XCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Terminal, Wrench, XCircle, Archive } from 'lucide-react'
 import type { UIMessage, ToolCall } from '@shared/types'
+import { COMPACT_SUMMARY_PREFIX } from '@shared/types'
 import { useAppStore } from '../store'
 
 interface Props {
@@ -14,6 +15,12 @@ interface Props {
 export default function MessageBubble({ message, toolStatuses }: Props) {
   const { t } = useTranslation()
   const retryStatus = useAppStore(s => s.retryStatus)
+
+  // 上下文压缩摘要消息：以 user 角色存库，但渲染为可折叠的系统摘要块（默认收起）
+  if (message.role === 'user' && typeof message.content === 'string' && message.content.startsWith(COMPACT_SUMMARY_PREFIX)) {
+    const body = message.content.slice(COMPACT_SUMMARY_PREFIX.length).trim()
+    return <CompactSummaryBlock summary={body} />
+  }
 
   // 用户消息（可含图片附件）
   if (message.role === 'user') {
@@ -66,6 +73,39 @@ export default function MessageBubble({ message, toolStatuses }: Props) {
       {message.toolCalls?.map(tc => (
         <ToolCallRow key={tc.id} toolCall={tc} status={toolStatuses?.[tc.id]} />
       ))}
+    </div>
+  )
+}
+
+/* ---------- 上下文压缩摘要块（默认收起，点击展开查看全文） ---------- */
+function CompactSummaryBlock({ summary }: { summary: string }) {
+  const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(false)
+  // 较长摘要提供展开/收起；短摘要单行预览即可
+  const isLong = summary.length > 160
+
+  return (
+    <div className="compact-summary">
+      <div className="compact-summary-inner">
+        <button className="compact-summary-header" onClick={() => isLong && setExpanded(!expanded)} disabled={!isLong}>
+          <Archive size={13} />
+          <span className="compact-summary-title">{t('compact.label')}</span>
+          {!expanded && (
+            <span className="compact-summary-preview">{summary}</span>
+          )}
+          {isLong && (
+            <span className="compact-summary-toggle">
+              {expanded ? t('message.collapse') : t('message.expand')}
+              {expanded ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+            </span>
+          )}
+        </button>
+        {expanded && (
+          <div className="compact-summary-body">
+            <ReactMarkdown>{summary}</ReactMarkdown>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

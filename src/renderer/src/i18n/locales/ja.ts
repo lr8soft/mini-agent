@@ -28,6 +28,8 @@ export default {
     compactNotice: 'コンテキストを圧縮しました：{{before}} → {{after}} tokens（早期{{compressed}}件を統合、直近{{kept}}件を保持）',
     compactNow: '圧縮',
     compactNowHint: '早期メッセージを要約にまとめてコンテキスト容量を解放します（実行中は利用不可）',
+    compactWorking: 'コンテキストを圧縮中…',
+    compactError: '圧縮に失敗しました',
     thinking: '考え中...',
     retrying: 'ネットワークが不安定です。再試行中（{{attempt}}/{{max}}）…',
     stop: '停止',
@@ -60,6 +62,9 @@ export default {
     error: 'エラー',
     collapse: '折りたたむ',
     expand: '展開'
+  },
+  compact: {
+    label: 'コンテキスト要約'
   },
   settings: {
     title: '設定',

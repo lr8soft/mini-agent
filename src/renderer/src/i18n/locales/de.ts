@@ -28,6 +28,8 @@ export default {
     compactNotice: 'Kontext komprimiert: {{before}} → {{after}} Tokens ({{compressed}} frühe Nachrichten zusammengefasst, {{kept}} letzte behalten)',
     compactNow: 'Komprimieren',
     compactNowHint: 'Frühere Nachrichten zu einer Zusammenfassung zusammenführen, um Kontextplatz freizugeben (während der Ausführung nicht verfügbar)',
+    compactWorking: 'Kontext wird komprimiert…',
+    compactError: 'Komprimierung fehlgeschlagen',
     thinking: 'Denke nach...',
     retrying: 'Netzwerk instabil, erneuter Versuch ({{attempt}}/{{max}})…',
     stop: 'Stopp',
@@ -60,6 +62,9 @@ export default {
     error: 'Fehler',
     collapse: 'Einklappen',
     expand: 'Ausklappen'
+  },
+  compact: {
+    label: 'Kontext-Zusammenfassung'
   },
   settings: {
     title: 'Einstellungen',

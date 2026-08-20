@@ -159,6 +159,9 @@ h1, h2, h3, p { margin: 0; }
 .compact-chip svg { flex: 0 0 auto; }
 .compact-chip:hover:not(:disabled) { color: var(--app-color-primary-strong); border-color: var(--app-color-primary); background: var(--app-color-active-bg); }
 .compact-chip:disabled { opacity: .45; cursor: not-allowed; }
+/* 压缩进行中：保持 spinner 清晰可见（覆盖 disabled 的淡化） */
+.compact-chip.compacting:disabled { opacity: 1; color: var(--app-color-primary-strong); border-color: var(--app-color-primary); background: var(--app-color-active-bg); cursor: default; }
+.compact-chip.compacting .spinner { width: 11px; height: 11px; }
 
 /* 批准模式下拉选择器 */
 .mode-selector { position: relative; display: inline-flex; }
@@ -196,6 +199,7 @@ h1, h2, h3, p { margin: 0; }
   background: color-mix(in srgb, var(--app-color-info) 8%, transparent); font-size: 0.733rem;
 }
 .compact-notice > svg { flex: 0 0 auto; }
+.compact-notice.error { color: var(--app-color-danger); border-bottom-color: color-mix(in srgb, var(--app-color-danger) 25%, transparent); background: color-mix(in srgb, var(--app-color-danger) 8%, transparent); }
 .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 18px; }
 .chat-inner { max-width: 860px; margin: 0 auto; display: grid; gap: 14px; align-content: start; }
 .chat-empty { padding: 90px 0 40px; text-align: center; }
@@ -218,6 +222,22 @@ h1, h2, h3, p { margin: 0; }
 .message-user-images { display: flex; flex-wrap: wrap; gap: 6px; max-width: 85%; justify-content: flex-end; }
 .message-user-images img { max-width: 220px; max-height: 220px; border: 1px solid var(--app-color-border); border-radius: 8px; }
 .message-user .message-user-images + .bubble { margin-top: 6px; }
+
+/* 上下文压缩摘要块（居中系统提示，默认收起） */
+.compact-summary { display: flex; justify-content: center; }
+.compact-summary-inner { width: 100%; max-width: 620px; border: 1px solid color-mix(in srgb, var(--app-color-primary) 20%, var(--app-color-border)); border-radius: 10px; background: color-mix(in srgb, var(--app-color-primary) 4%, var(--app-color-surface)); overflow: hidden; }
+.compact-summary-header { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 14px; border: 0; background: transparent; cursor: pointer; color: var(--app-color-text-soft); font-size: 0.8rem; text-align: left; }
+.compact-summary-header:disabled { cursor: default; }
+.compact-summary-header > svg { flex: 0 0 auto; color: var(--app-color-primary-strong); }
+.compact-summary-title { flex: 0 0 auto; font-weight: 650; color: var(--app-color-text); }
+.compact-summary-preview { flex: 1 1 auto; overflow: hidden; color: var(--app-color-text-mute); font-size: 0.767rem; text-overflow: ellipsis; white-space: nowrap; }
+.compact-summary-toggle { flex: 0 0 auto; display: flex; align-items: center; gap: 3px; color: var(--app-color-text-mute); font-size: 0.733rem; }
+.compact-summary-toggle svg { flex: 0 0 auto; }
+.compact-summary-header:hover:not(:disabled) .compact-summary-toggle { color: var(--app-color-text); }
+.compact-summary-body { padding: 8px 14px 13px; border-top: 1px dashed var(--app-color-border); color: var(--app-color-text-soft); font-size: 0.833rem; line-height: 1.6; max-height: 320px; overflow: auto; }
+.compact-summary-body p { margin: 0 0 8px; }
+.compact-summary-body p:last-child { margin-bottom: 0; }
+.compact-summary-body code, .compact-summary-body pre { font-family: Consolas, Monaco, monospace; font-size: 0.767rem; }
 
 /* 输入区图片附件 */
 .attach-button { width: 42px; height: 42px; flex: 0 0 auto; display: grid; place-items: center; color: var(--app-color-text-soft); border: 1px solid var(--app-color-border); border-radius: 6px; background: var(--app-color-surface); cursor: pointer; }
