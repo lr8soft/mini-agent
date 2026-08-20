@@ -2,7 +2,7 @@
 // Zustand Store — 渲染进程全局状态
 // ============================================================
 import { create } from 'zustand'
-import type { Session, UIMessage, AppSettings, ToolCall } from '@shared/types'
+import type { Session, UIMessage, AppSettings, ToolCall, AutoApproveMode } from '@shared/types'
 
 const api = window.api
 
@@ -33,10 +33,22 @@ function getStoredFontSize(): number {
   }
 }
 
+function getStoredApproveMode(): AutoApproveMode {
+  try {
+    const stored = localStorage.getItem('zhumora.approveMode')
+    return stored === 'manual' || stored === 'auto' || stored === 'full' ? stored : 'manual'
+  } catch {
+    return 'manual'
+  }
+}
+
 interface PermissionRequest {
   permId: string
+  sessionId: string
   toolName: string
   args: Record<string, unknown>
+  /** 工具权限等级（用于 UI 展示不同警告强度） */
+  level?: string
 }
 
 interface AppState {
@@ -73,9 +85,9 @@ interface AppState {
   selectedProviderModel: string | null
   setSelectedProviderModel: (v: string | null) => void
 
-  // 自动批准
-  autoApprove: boolean
-  setAutoApprove: (v: boolean) => void
+  // 批准模式（三档：manual / auto / full）
+  approveMode: AutoApproveMode
+  setApproveMode: (v: AutoApproveMode) => void
 
   // 权限
   permissionRequest: PermissionRequest | null
@@ -149,9 +161,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedProviderModel: null,
   setSelectedProviderModel: (v) => set({ selectedProviderModel: v }),
 
-  // ---- 自动批准 ----
-  autoApprove: false,
-  setAutoApprove: (v) => set({ autoApprove: v }),
+  // ---- 批准模式（三档）----
+  approveMode: getStoredApproveMode(),
+  setApproveMode: (v) => {
+    set({ approveMode: v })
+    try { localStorage.setItem('zhumora.approveMode', v) } catch { /* ignore */ }
+    // 同步到 main 进程（如果当前会话正在运行中，即时生效）
+    const { activeSessionId } = get()
+    if (activeSessionId) {
+      api.agent.setApproveMode(activeSessionId, v)
+    }
+  },
 
   sendMessage: async (text: string, images?: string[]) => {
     let { activeSessionId } = get()
@@ -202,7 +222,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const result = await api.agent.run(activeSessionId, { text, images }, {
         providerId,
         modelOverride,
-        autoApprove: get().autoApprove
+        approveMode: get().approveMode
       })
       if (result.error) {
         set((s) => ({

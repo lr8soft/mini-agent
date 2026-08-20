@@ -8,7 +8,8 @@ export default function PermissionDialog() {
 
   if (!permissionRequest) return null
 
-  const { permId, toolName, args } = permissionRequest
+  const { permId, toolName, args, level } = permissionRequest
+  const isDangerous = level === 'dangerous'
 
   const handleResponse = (allowed: boolean) => {
     respondPermission(allowed)
@@ -19,10 +20,12 @@ export default function PermissionDialog() {
       <div className="dialog" role="dialog" aria-modal="true">
         <div className="dialog-header">
           <div>
-            <span className="dialog-title-icon"><ShieldAlert size={17} /></span>
+            <span className={`dialog-title-icon${isDangerous ? ' dangerous' : ''}`}>
+              <ShieldAlert size={17} />
+            </span>
             <div>
-              <h2>{t('permission.title')}</h2>
-              <p>{t('permission.description')}</p>
+              <h2>{isDangerous ? t('permission.titleDangerous') : t('permission.title')}</h2>
+              <p>{isDangerous ? t('permission.descriptionDangerous') : t('permission.description')}</p>
             </div>
           </div>
         </div>
@@ -31,6 +34,7 @@ export default function PermissionDialog() {
           <div className="dialog-tool-name">
             <Wrench size={14} />
             {toolName}
+            {isDangerous && <span className="dialog-level-badge">{t('permission.levelDangerous')}</span>}
           </div>
           <pre className="dialog-args">{JSON.stringify(args, null, 2)}</pre>
         </div>

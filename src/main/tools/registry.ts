@@ -4,10 +4,12 @@
 import type { ToolDefinition } from '../../shared/types'
 
 /**
- * 工具权限等级
- * - safe:      永远自动放行（只读、无副作用操作）
- * - normal:    默认需确认，autoApprove 开启时自动放行
- * - dangerous: 始终需要用户确认，autoApprove 也无法跳过
+ * 工具权限等级（与三档批准模式 AutoApproveMode 配合使用）
+ * - safe:      任何模式下都自动放行（只读、无副作用操作）
+ * - normal:    manual 模式弹窗确认；auto / full 模式自动放行
+ * - dangerous: manual / auto 模式都弹窗确认；仅 full 模式自动放行
+ *
+ * 批准模式：manual（safe 放行，其余弹窗）/ auto（safe+normal 放行，dangerous 弹窗）/ full（全部放行）
  */
 export type PermissionLevel = 'safe' | 'normal' | 'dangerous'
 

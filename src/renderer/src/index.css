@@ -75,7 +75,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .window-identity { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 12px; }
 .titlebar-icon { width: 20px; height: 20px; flex: 0 0 auto; display: block; border-radius: 5px; }
-.window-identity span { overflow: hidden; font-size: 0.8rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.window-identity span { overflow: hidden; font-size: 1.133rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .window-drag-space { min-width: 40px; flex: 1; }
 .window-controls { display: flex; -webkit-app-region: no-drag; }
 .window-controls button { width: 46px; height: 39px; display: grid; place-items: center; padding: 0; color: var(--app-color-text-soft); border: 0; background: transparent; cursor: default; }
@@ -146,6 +146,30 @@ h1, h2, h3, p { margin: 0; }
 }
 .toggle-chip svg { flex: 0 0 auto; }
 .toggle-chip.active { color: var(--app-color-primary-strong); border-color: var(--app-color-primary); background: var(--app-color-active-bg); }
+.toggle-chip.mode-auto { color: var(--app-color-info); border-color: var(--app-color-info); background: color-mix(in srgb, var(--app-color-info) 8%, transparent); }
+.toggle-chip.mode-full { color: var(--app-color-warn); border-color: var(--app-color-warn); background: color-mix(in srgb, var(--app-color-warn) 8%, transparent); }
+
+/* 批准模式下拉选择器 */
+.mode-selector { position: relative; display: inline-flex; }
+.mode-menu-backdrop { position: fixed; inset: 0; z-index: 100; }
+.mode-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 200;
+  min-width: 240px; display: flex; flex-direction: column; gap: 2px; padding: 4px;
+  border: 1px solid var(--app-color-border); border-radius: 8px;
+  background: var(--app-color-surface-solid); box-shadow: var(--app-shadow-panel);
+}
+.mode-menu-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 0; border-radius: 6px; background: transparent; cursor: pointer;
+  color: var(--app-color-text-soft); text-align: left;
+}
+.mode-menu-item:hover { background: var(--app-muted-bg); color: var(--app-color-text); }
+.mode-menu-item.active { background: var(--app-color-active-bg); color: var(--app-color-text); }
+.mode-menu-item > svg { flex: 0 0 auto; color: var(--app-color-text-mute); }
+.mode-menu-item.active > svg { color: var(--app-color-primary-strong); }
+.mode-menu-label { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mode-menu-label strong { font-size: 0.767rem; font-weight: 650; }
+.mode-menu-label small { font-size: 0.667rem; color: var(--app-color-text-mute); }
 .thinking { display: flex; align-items: center; gap: 6px; color: var(--app-color-text-mute); font-size: 0.733rem; }
 @keyframes app-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .pulse-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--app-color-primary); animation: app-pulse 1.1s ease-in-out infinite; }
@@ -410,6 +434,8 @@ select.input-field { cursor: pointer; }
 .dialog-header h2 { font-size: 0.933rem; font-weight: 650; }
 .dialog-header p { margin-top: 2px; color: var(--app-color-text-soft); font-size: 0.733rem; }
 .dialog-body { padding: 14px 16px; }
+.dialog-title-icon.dangerous { color: #fff; background: var(--app-color-danger); animation: app-pulse 1.1s ease-in-out infinite; }
+.dialog-level-badge { margin-left: 4px; padding: 1px 6px; border-radius: 999px; color: #fff; background: var(--app-color-danger); font-size: 0.6rem; font-weight: 700; letter-spacing: .04em; font-family: inherit; }
 .dialog-tool-name { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; color: var(--app-color-primary-strong); font-family: Consolas, Monaco, monospace; font-size: 0.867rem; font-weight: 650; }
 .dialog-args { margin: 0; padding: 10px 12px; max-height: 200px; overflow: auto; border: 1px solid var(--app-color-border); border-radius: 6px; background: var(--app-muted-bg); color: var(--app-color-text-soft); font-family: Consolas, Monaco, monospace; font-size: 0.733rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 .dialog-footer { display: flex; gap: 10px; padding: 13px 16px; border-top: 1px solid var(--app-color-border); background: var(--app-chrome-bg); }

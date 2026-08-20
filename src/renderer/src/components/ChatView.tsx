@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, ImagePlus, Send, ShieldCheck, ShieldOff, Square, X } from 'lucide-react'
+import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X } from 'lucide-react'
 import { processImageFile, ImageAttachmentError, MAX_IMAGES } from '../utils/image'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
+import type { AutoApproveMode } from '@shared/types'
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, autoApprove, setAutoApprove } = useAppStore()
+  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -15,6 +16,8 @@ export default function ChatView() {
   const [pendingImages, setPendingImages] = useState<string[]>([])
   const [imageError, setImageError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // 批准模式下拉是否展开
+  const [modeMenuOpen, setModeMenuOpen] = useState(false)
 
   // 当前 session 的工作目录
   const activeSession = sessions.find(s => s.id === activeSessionId)
@@ -153,6 +156,31 @@ export default function ChatView() {
     )
   }
 
+  /** 批准模式图标 + 颜色映射 */
+  const modeIcon = (mode: AutoApproveMode) => {
+    switch (mode) {
+      case 'manual': return <ShieldOff size={13} />
+      case 'auto': return <Shield size={13} />
+      case 'full': return <ShieldCheck size={13} />
+    }
+  }
+
+  const modeLabel = (mode: AutoApproveMode) => {
+    switch (mode) {
+      case 'manual': return t('chat.approveManual')
+      case 'auto': return t('chat.approveAuto')
+      case 'full': return t('chat.approveFull')
+    }
+  }
+
+  const modeHint = (mode: AutoApproveMode) => {
+    switch (mode) {
+      case 'manual': return t('chat.approveManualHint')
+      case 'auto': return t('chat.approveAutoHint')
+      case 'full': return t('chat.approveFullHint')
+    }
+  }
+
   return (
     <div className="chat-view">
       {/* 顶部栏 */}
@@ -170,15 +198,38 @@ export default function ChatView() {
           </button>
         </div>
         <div className="chat-topbar-right">
-          {/* 自动批准开关 */}
-          <button
-            className={autoApprove ? 'toggle-chip active' : 'toggle-chip'}
-            onClick={() => setAutoApprove(!autoApprove)}
-            title={autoApprove ? t('chat.autoApproveOnHint') : t('chat.autoApproveOffHint')}
-          >
-            {autoApprove ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
-            {autoApprove ? t('chat.autoApproveOn') : t('chat.autoApproveOff')}
-          </button>
+          {/* 批准模式下拉选择器 */}
+          <div className="mode-selector">
+            <button
+              className={approveMode === 'full' ? 'toggle-chip mode-full' : approveMode === 'auto' ? 'toggle-chip mode-auto' : 'toggle-chip'}
+              onClick={() => setModeMenuOpen(!modeMenuOpen)}
+              title={modeHint(approveMode)}
+            >
+              {modeIcon(approveMode)}
+              {modeLabel(approveMode)}
+            </button>
+            {modeMenuOpen && (
+              <>
+                <div className="mode-menu-backdrop" onClick={() => setModeMenuOpen(false)} />
+                <div className="mode-menu">
+                  {(['manual', 'auto', 'full'] as AutoApproveMode[]).map(mode => (
+                    <button
+                      key={mode}
+                      className={mode === approveMode ? 'mode-menu-item active' : 'mode-menu-item'}
+                      onClick={() => { setApproveMode(mode); setModeMenuOpen(false) }}
+                      title={modeHint(mode)}
+                    >
+                      {modeIcon(mode)}
+                      <span className="mode-menu-label">
+                        <strong>{modeLabel(mode)}</strong>
+                        <small>{modeHint(mode)}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {isRunning && (
             <>
               <span className="thinking">

@@ -3,7 +3,7 @@
 // 通过 contextBridge 暴露最小化 API surface
 // ============================================================
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppSettings, Session, UIMessage, UserMessageInput } from '../shared/types'
+import type { AppSettings, Session, UIMessage, UserMessageInput, AutoApproveMode } from '../shared/types'
 
 const api = {
   // ============================================================
@@ -50,11 +50,14 @@ const api = {
   // ============================================================
   agent: {
     /** 发送消息并启动 agent 运行 */
-    run: (sessionId: string, message: UserMessageInput, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
+    run: (sessionId: string, message: UserMessageInput, options?: { providerId?: string; modelOverride?: string; approveMode?: AutoApproveMode }): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
       ipcRenderer.invoke('agent:run', sessionId, message, options),
     /** 中止当前运行 */
     abort: (sessionId: string): Promise<boolean> =>
       ipcRenderer.invoke('agent:abort', sessionId),
+    /** 动态切换批准模式（运行中即时生效） */
+    setApproveMode: (sessionId: string, mode: AutoApproveMode): Promise<boolean> =>
+      ipcRenderer.invoke('agent:set-approve-mode', sessionId, mode),
     /** 回复权限请求 */
     respondPermission: (permId: string, allowed: boolean): Promise<boolean> =>
       ipcRenderer.invoke('agent:permission_response', permId, allowed),
@@ -90,7 +93,7 @@ const api = {
       ipcRenderer.on('agent:retry', handler)
       return () => ipcRenderer.removeListener('agent:retry', handler)
     },
-    onPermissionRequest: (cb: (data: { sessionId: string; permId: string; toolName: string; args: any }) => void) => {
+    onPermissionRequest: (cb: (data: { sessionId: string; permId: string; toolName: string; args: any; level?: string }) => void) => {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('agent:permission_request', handler)
       return () => ipcRenderer.removeListener('agent:permission_request', handler)

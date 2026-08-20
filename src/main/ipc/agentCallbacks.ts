@@ -5,6 +5,7 @@ import type { BrowserWindow } from 'electron'
 import type { AgentEventCallbacks } from '../agent/runner'
 import type { TokenUsage } from '../llm/provider'
 import type { PermissionLevel } from '../tools/registry'
+import type { AutoApproveMode } from '../../shared/types'
 import { getToolPermission } from '../tools/registry'
 import * as db from '../store/db'
 import { log } from '../llm/logger'
@@ -118,38 +119,48 @@ export function buildAgentCallbacks(
 /**
  * 构建权限检查闭包
  *
- * 统一决策：根据工具权限等级 + autoApprove 决定是否弹窗
- * - autoApprove=true: 所有工具自动放行（safe/normal/dangerous 全部跳过弹窗）
- * - autoApprove=false:
- *   - safe:      永远自动放行
- *   - normal:    弹窗确认
- *   - dangerous: 弹窗确认
+ * 三档批准模式：
+ * - manual: safe 放行，normal + dangerous 弹窗
+ * - auto:   safe + normal 放行，dangerous 弹窗
+ * - full:   全部放行，不弹窗
+ *
+ * 注意：approveModeGetter 是函数而非固定值，
+ * 这样渲染进程运行中切换模式时 main 进程能实时感知。
  */
 export function buildPermissionCheck(
   sessionId: string,
-  autoApprove: boolean,
+  approveModeGetter: () => AutoApproveMode,
   sender: Electron.WebContents,
   pendingPermissions: Map<string, { resolve: (ok: boolean) => void }>
 ): (toolName: string, args: Record<string, unknown>) => Promise<boolean> {
   return async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
     const level: PermissionLevel = getToolPermission(toolName)
+    const mode = approveModeGetter()
 
-    // safe 工具永远放行
+    // full 模式：全部放行
+    if (mode === 'full') {
+      return true
+    }
+
+    // safe 工具在所有模式下都放行
     if (level === 'safe') {
       return true
     }
 
-    // autoApprove 开启时，所有工具（包括 dangerous）自动放行
-    if (autoApprove) {
+    // auto 模式：normal 也放行，仅 dangerous 需要弹窗
+    if (mode === 'auto' && level === 'normal') {
       return true
     }
 
-    // normal 或 dangerous，且未开启 autoApprove → 弹窗确认
+    // 到达这里 = 需要弹窗确认：
+    //   manual 模式的 normal + dangerous
+    //   auto 模式的 dangerous
     const permId = genId()
+    log('info', `Permission dialog needed: tool=${toolName}, level=${level}, mode=${mode}, permId=${permId}`)
     return new Promise<boolean>((resolve) => {
       pendingPermissions.set(permId, { resolve })
       sender.send('agent:permission_request', {
-        sessionId, permId, toolName, args
+        sessionId, permId, toolName, args, level
       })
     })
   }

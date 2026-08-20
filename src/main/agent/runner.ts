@@ -55,7 +55,7 @@ export interface AgentRunOptions {
   provider: ProviderConfig
   workspacePath: string
   sessionId?: string
-  /** 权限回调：返回 true 允许执行。决策逻辑由调用方实现（结合 autoApprove 和工具权限等级） */
+  /** 权限回调：返回 true 允许执行。决策逻辑由调用方实现（结合三档批准模式 approveMode 和工具权限等级） */
   permissionCheck?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
   signal?: AbortSignal
   systemPromptExtra?: string
@@ -218,7 +218,7 @@ export async function runAgent(
 
         if (!isError) {
           // 权限检查 — 统一由 permissionCheck 决策
-          // permissionCheck 内部根据工具权限等级 + autoApprove 判断是否需要弹窗
+          // permissionCheck 内部根据三档批准模式 + 工具权限等级判断是否需要弹窗
           if (permissionCheck) {
             const allowed = await permissionCheck(tc.function.name, parsedArgs)
             if (!allowed) {

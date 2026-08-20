@@ -148,8 +148,8 @@ export default function App() {
       }),
 
       // 权限请求
-      window.api.agent.onPermissionRequest(({ permId, toolName, args }) => {
-        useAppStore.setState({ permissionRequest: { permId, toolName, args } })
+      window.api.agent.onPermissionRequest(({ sessionId, permId, toolName, args, level }) => {
+        useAppStore.setState({ permissionRequest: { permId, sessionId, toolName, args, level } })
       }),
 
       // 标题更新

@@ -3,7 +3,7 @@
 // 所有来自渲染进程的请求在这里注册
 // ============================================================
 import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
-import type { AppSettings, ChatMessage, UserMessageInput } from '../../shared/types'
+import type { AppSettings, ChatMessage, UserMessageInput, AutoApproveMode } from '../../shared/types'
 import { buildUserContent } from '../../shared/multimodal'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
@@ -25,8 +25,16 @@ let mainWindow: BrowserWindow | null = null
 // 活跃的 abort 控制器，按 sessionId 区分
 const abortControllers = new Map<string, AbortController>()
 
-// 权限回调队列（按 toolCallId 等待用户响应）
+// 权限回调队列（按 permId 等待用户响应）
 const pendingPermissions = new Map<string, { resolve: (ok: boolean) => void }>()
+
+// 批准模式（按 sessionId 动态存储，运行中可实时切换）
+const approveModeMap = new Map<string, AutoApproveMode>()
+
+/** 获取某会话的批准模式（未设置时默认 manual） */
+function getApproveMode(sessionId: string): AutoApproveMode {
+  return approveModeMap.get(sessionId) || 'manual'
+}
 
 export function setupIpc(win: BrowserWindow): void {
   mainWindow = win
@@ -87,6 +95,7 @@ export function setupIpc(win: BrowserWindow): void {
 
   ipcMain.handle('session:delete', (_e, id: string) => {
     db.deleteSession(id)
+    approveModeMap.delete(id)
     return true
   })
 
@@ -102,10 +111,14 @@ export function setupIpc(win: BrowserWindow): void {
   // ============================================================
   // Agent 对话
   // ============================================================
-  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: UserMessageInput, options?: { providerId?: string; modelOverride?: string; autoApprove?: boolean }) => {
+  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: UserMessageInput, options?: { providerId?: string; modelOverride?: string; approveMode?: AutoApproveMode }) => {
     // 只接受合法的 data URL 图片（渲染进程已过滤，这里二次防御）
     const inputImages = (userMessage.images || []).filter(u => typeof u === 'string' && u.startsWith('data:image/'))
-    log('info', `agent:run — sessionId=${sessionId}, autoApprove=${options?.autoApprove}, providerId=${options?.providerId || '(active)'}, modelOverride=${options?.modelOverride || '(default)'}, images=${inputImages.length}`)
+    // 初始化批准模式（renderer 传入的值作为初始值，之后通过 agent:set-approve-mode 动态更新）
+    if (options?.approveMode) {
+      approveModeMap.set(sessionId, options.approveMode)
+    }
+    log('info', `agent:run — sessionId=${sessionId}, approveMode=${getApproveMode(sessionId)}, providerId=${options?.providerId || '(active)'}, modelOverride=${options?.modelOverride || '(default)'}, images=${inputImages.length}`)
     const settings = db.getSettings()
     // 优先用 options.providerId（聊天页下拉框选择），否则用 settings.activeProviderId
     const providerId = options?.providerId || settings.activeProviderId
@@ -142,10 +155,10 @@ export function setupIpc(win: BrowserWindow): void {
     // 构建回调（流式 token / 工具调用 / DB 持久化）
     const { callbacks } = buildAgentCallbacks(sessionId, e.sender)
 
-    // 构建权限检查闭包
+    // 构建权限检查闭包 — 使用动态 getter，运行中切换模式即时生效
     const permissionCheck = buildPermissionCheck(
       sessionId,
-      options?.autoApprove === true,
+      () => getApproveMode(sessionId),
       e.sender,
       pendingPermissions
     )
@@ -182,6 +195,7 @@ export function setupIpc(win: BrowserWindow): void {
       return { error: msg }
     } finally {
       abortControllers.delete(sessionId)
+      approveModeMap.delete(sessionId)
     }
   })
 
@@ -192,6 +206,18 @@ export function setupIpc(win: BrowserWindow): void {
       ctrl.abort()
       abortControllers.delete(sessionId)
     }
+    // 清理该会话的悬挂权限请求（以 false resolve，避免内存泄漏）
+    for (const [permId, pending] of pendingPermissions) {
+      pending.resolve(false)
+      pendingPermissions.delete(permId)
+    }
+    return true
+  })
+
+  // 动态切换批准模式（运行中即时生效）
+  ipcMain.handle('agent:set-approve-mode', (_e, sessionId: string, mode: AutoApproveMode) => {
+    approveModeMap.set(sessionId, mode)
+    log('info', `approveMode changed: sessionId=${sessionId}, mode=${mode}`)
     return true
   })
 

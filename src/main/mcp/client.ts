@@ -172,7 +172,7 @@ export async function connectMcpServer(config: McpServerConfig): Promise<void> {
             parameters: tool.inputSchema || { type: 'object', properties: {} }
           }
         },
-        // MCP 工具默认 normal 权限（autoApprove 时自动放行，否则弹窗确认）
+        // MCP 工具默认 normal 权限（manual 模式弹窗确认；auto/full 模式自动放行）
         permission: 'normal',
         async execute(args: Record<string, unknown>, ctx: ToolContext) {
           try {

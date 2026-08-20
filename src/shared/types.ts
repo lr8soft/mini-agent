@@ -111,7 +111,7 @@ export interface McpServerConfig {
   authToken?: string
   /** API Key（authType=apikey 时使用，发送到 authHeader 指定的 header） */
   apiKey?: string
-  /** API Key 使用的 header 名称（authType=apikey 时使用，默认 X-API-Key） */
+  /** API Key 使用的 header 名称（默认 X-API-Key） */
   authHeader?: string
   enabled: boolean
 }
@@ -123,6 +123,13 @@ export interface SkillConfig {
   path: string                     // SKILL.md 路径
   enabled: boolean
 }
+
+/** 工具调用批准模式（三档）
+ * - manual: 手动批准 — safe 放行，normal + dangerous 都弹窗
+ * - auto:   自动批准 — safe + normal 放行，dangerous 弹窗
+ * - full:   全自动批准 — 全部放行，不弹窗
+ */
+export type AutoApproveMode = 'manual' | 'auto' | 'full'
 
 /** 设置 */
 export interface AppSettings {
