@@ -26,6 +26,8 @@ export default {
     approveAutoHint: 'safe + normal automatisch, nur dangerous erfordert Bestätigung',
     approveFullHint: 'Alle Tool-Aufrufe automatisch, keine Bestätigung',
     compactNotice: 'Kontext komprimiert: {{before}} → {{after}} Tokens ({{compressed}} frühe Nachrichten zusammengefasst, {{kept}} letzte behalten)',
+    compactNow: 'Komprimieren',
+    compactNowHint: 'Frühere Nachrichten zu einer Zusammenfassung zusammenführen, um Kontextplatz freizugeben (während der Ausführung nicht verfügbar)',
     thinking: 'Denke nach...',
     retrying: 'Netzwerk instabil, erneuter Versuch ({{attempt}}/{{max}})…',
     stop: 'Stopp',

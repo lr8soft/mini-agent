@@ -26,6 +26,8 @@ export default {
     approveAutoHint: 'safe + normal auto-pass, only dangerous requires confirmation',
     approveFullHint: 'All tool calls auto-pass, no confirmation dialogs',
     compactNotice: 'Context compacted: {{before}} → {{after}} tokens ({{compressed}} early messages merged, kept {{kept}} recent)',
+    compactNow: 'Compress',
+    compactNowHint: 'Merge early messages into a summary to free up context space (unavailable while running)',
     thinking: 'Thinking...',
     retrying: 'Network unstable, retrying ({{attempt}}/{{max}})…',
     stop: 'Stop',

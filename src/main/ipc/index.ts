@@ -7,6 +7,7 @@ import type { AppSettings, ChatMessage, UserMessageInput, AutoApproveMode } from
 import { buildUserContent } from '../../shared/multimodal'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
+import { autoCompact } from '../agent/context'
 import { sanitizeHistory } from '../agent/history'
 import { log } from '../llm/logger'
 import { registerTool, clearTools } from '../tools/registry'
@@ -219,6 +220,64 @@ export function setupIpc(win: BrowserWindow): void {
     approveModeMap.set(sessionId, mode)
     log('info', `approveMode changed: sessionId=${sessionId}, mode=${mode}`)
     return true
+  })
+
+  // 手动压缩上下文（复用 autoCompact 逻辑，压缩后把保留消息写回 DB）
+  ipcMain.handle('agent:compact-now', async (e, sessionId: string) => {
+    // 运行中不允许手动压缩：workingMessages 与 DB 会不一致
+    if (abortControllers.has(sessionId)) {
+      return { error: 'Agent is running. Wait for it to finish before compacting.' }
+    }
+
+    const settings = db.getSettings()
+    const provider = settings.providers.find(p => p.id === settings.activeProviderId)
+    if (!provider) {
+      return { error: 'No active provider. Please configure one in Settings.' }
+    }
+
+    const uiMessages = db.getMessages(sessionId)
+    // 与 agent:run 相同的组装：图片转多模态 + sanitize 非法序列
+    const chatMessages: ChatMessage[] = sanitizeHistory(uiMessages.map(m => ({
+      role: m.role,
+      content: m.role === 'user' && m.images && m.images.length > 0
+        ? buildUserContent(m.content, m.images)
+        : m.content,
+      tool_calls: m.toolCalls,
+      tool_call_id: m.toolCallId,
+      name: m.toolName
+    })))
+
+    try {
+      const { messages: compacted, info, keptUiMessages } = await autoCompact(chatMessages, provider, undefined, uiMessages)
+      if (info.compressedCount <= 0) {
+        return { ok: true, info }
+      }
+
+      // 重建会话历史：删除旧消息 → 写入摘要 + 保留的原始消息
+      db.deleteMessages(sessionId)
+      const summaryMsg = compacted.find(m => m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('[Auto Compact Summary]'))
+      if (summaryMsg && typeof summaryMsg.content === 'string') {
+        db.addMessage({
+          id: genId(),
+          sessionId,
+          role: 'user',
+          content: summaryMsg.content,
+          timestamp: Date.now(),
+          status: 'done'
+        })
+      }
+      for (const m of keptUiMessages || []) {
+        db.addMessage(m)
+      }
+      // 通知前端展示压缩提示
+      e.sender.send('agent:compact', { sessionId, ...info })
+      log('info', `Manual compact done: sessionId=${sessionId}, ${info.beforeTokens} → ${info.afterTokens} tokens`)
+      return { ok: true, info }
+    } catch (err) {
+      const msg = (err as Error).message
+      log('error', `Manual compact failed: ${msg}`)
+      return { error: msg }
+    }
   })
 
   // 权限响应

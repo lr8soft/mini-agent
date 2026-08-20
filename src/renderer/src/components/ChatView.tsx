@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X, MinusCircle } from 'lucide-react'
+import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X, MinusCircle, Shrink } from 'lucide-react'
 import { processImageFile, ImageAttachmentError, MAX_IMAGES } from '../utils/image'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
@@ -8,7 +8,7 @@ import type { AutoApproveMode } from '@shared/types'
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, compactNotice } = useAppStore()
+  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, compactNotice, compactNow } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -230,6 +230,16 @@ export default function ChatView() {
               </>
             )}
           </div>
+          {/* 手动压缩上下文按钮（模仿 Cline：将早期消息合并为摘要，释放上下文空间） */}
+          <button
+            className="compact-chip"
+            onClick={() => void compactNow()}
+            disabled={isRunning || messages.length < 10}
+            title={t('chat.compactNowHint')}
+          >
+            <Shrink size={13} />
+            {t('chat.compactNow')}
+          </button>
           {isRunning && (
             <>
               <span className="thinking">

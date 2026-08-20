@@ -26,6 +26,8 @@ export default {
     approveAutoHint: 'safe + normal automatique, seul dangerous nécessite confirmation',
     approveFullHint: 'Tous les appels d\'outils automatiques, aucune confirmation',
     compactNotice: 'Contexte compressé : {{before}} → {{after}} tokens ({{compressed}} anciens messages fusionnés, {{kept}} récents conservés)',
+    compactNow: 'Compresser',
+    compactNowHint: 'Fusionner les anciens messages en un résumé pour libérer de l\'espace de contexte (indisponible pendant l\'exécution)',
     thinking: 'Réflexion...',
     retrying: 'Réseau instable, nouvelle tentative ({{attempt}}/{{max}})…',
     stop: 'Arrêter',

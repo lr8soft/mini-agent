@@ -26,6 +26,8 @@ export default {
     approveAutoHint: 'safe + normal は自動通過、dangerous のみ確認が必要',
     approveFullHint: '全ツール呼び出しが自動通過、確認ダイアログなし',
     compactNotice: 'コンテキストを圧縮しました：{{before}} → {{after}} tokens（早期{{compressed}}件を統合、直近{{kept}}件を保持）',
+    compactNow: '圧縮',
+    compactNowHint: '早期メッセージを要約にまとめてコンテキスト容量を解放します（実行中は利用不可）',
     thinking: '考え中...',
     retrying: 'ネットワークが不安定です。再試行中（{{attempt}}/{{max}}）…',
     stop: '停止',

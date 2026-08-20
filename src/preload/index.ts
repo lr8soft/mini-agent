@@ -58,6 +58,9 @@ const api = {
     /** 动态切换批准模式（运行中即时生效） */
     setApproveMode: (sessionId: string, mode: AutoApproveMode): Promise<boolean> =>
       ipcRenderer.invoke('agent:set-approve-mode', sessionId, mode),
+    /** 手动压缩当前会话上下文（早期消息合并为摘要，保留最近消息） */
+    compactNow: (sessionId: string): Promise<{ ok?: boolean; error?: string; info?: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number } }> =>
+      ipcRenderer.invoke('agent:compact-now', sessionId),
     /** 回复权限请求 */
     respondPermission: (permId: string, allowed: boolean): Promise<boolean> =>
       ipcRenderer.invoke('agent:permission_response', permId, allowed),

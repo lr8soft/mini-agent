@@ -104,6 +104,8 @@ interface AppState {
   sendMessage: (text: string, images?: string[]) => Promise<void>
   abortAgent: () => void
   respondPermission: (allowed: boolean) => void
+  /** 手动压缩当前会话上下文（运行中不可用） */
+  compactNow: () => Promise<void>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -277,6 +279,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       api.agent.respondPermission(permissionRequest.permId, allowed)
       set({ permissionRequest: null })
     }
+  },
+
+  compactNow: async () => {
+    const { activeSessionId, isRunning } = get()
+    if (!activeSessionId || isRunning) return
+    const res = await api.agent.compactNow(activeSessionId)
+    if (res.error) {
+      console.error('Manual compact error:', res.error)
+      return
+    }
+    // 主进程压缩成功后会广播 agent:compact → App.tsx 设置 compactNotice 展示提示
+    // 这里刷新消息列表：早期消息已被摘要替换
+    await get().loadMessages(activeSessionId)
   },
 
   // ---- 权限 ----

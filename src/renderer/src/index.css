@@ -149,6 +149,17 @@ h1, h2, h3, p { margin: 0; }
 .toggle-chip.mode-auto { color: var(--app-color-info); border-color: var(--app-color-info); background: color-mix(in srgb, var(--app-color-info) 8%, transparent); }
 .toggle-chip.mode-full { color: var(--app-color-warn); border-color: var(--app-color-warn); background: color-mix(in srgb, var(--app-color-warn) 8%, transparent); }
 
+/* 手动压缩上下文按钮 */
+.compact-chip {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  color: var(--app-color-text-mute); border: 1px solid var(--app-color-border); border-radius: 999px;
+  background: var(--app-color-surface); font-size: 0.733rem; font-weight: 600; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.compact-chip svg { flex: 0 0 auto; }
+.compact-chip:hover:not(:disabled) { color: var(--app-color-primary-strong); border-color: var(--app-color-primary); background: var(--app-color-active-bg); }
+.compact-chip:disabled { opacity: .45; cursor: not-allowed; }
+
 /* 批准模式下拉选择器 */
 .mode-selector { position: relative; display: inline-flex; }
 .mode-menu-backdrop { position: fixed; inset: 0; z-index: 100; }

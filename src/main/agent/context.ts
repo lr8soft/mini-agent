@@ -3,7 +3,7 @@
 // 当上下文使用超过阈值时自动压缩对话历史
 // ============================================================
 import { extractTextContent } from '../../shared/multimodal'
-import type { ChatMessage, ProviderConfig } from '../../shared/types'
+import type { ChatMessage, ProviderConfig, UIMessage } from '../../shared/types'
 import { complete } from '../llm/provider'
 import { log } from '../llm/logger'
 import { planCompact } from './history'
@@ -206,15 +206,24 @@ export function needsCompact(
 export interface CompactResult {
   messages: ChatMessage[]
   info: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number }
+  /**
+   * 被保留的原始 UI 消息（带 id/timestamp），仅当调用方传入 uiMessages 时提供。
+   * 手动压缩写回 DB 时使用：摘要消息 + 这些保留消息 重建会话历史。
+   */
+  keptUiMessages?: UIMessage[]
 }
 
 /**
  * 执行 auto compact：将早期消息压缩为摘要，保留最近 N 条
+ *
+ * @param uiMessages 可选。与 messages 同源的原始 UI 消息（DB 行，带 id/timestamp），
+ *                   用于在压缩后把保留部分原样写回数据库（手动压缩场景）。
  */
 export async function autoCompact(
   messages: ChatMessage[],
   provider: ProviderConfig,
-  modelOverride?: string
+  modelOverride?: string,
+  uiMessages?: UIMessage[]
 ): Promise<CompactResult> {
   // 分离 system 消息和对话消息
   const systemMsgs: ChatMessage[] = []
@@ -239,6 +248,10 @@ export async function autoCompact(
     log('info', 'Auto compact: no safe boundary to split, skipping')
     return { messages, info: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: conversationMsgs.length } }
   }
+
+  // 与 toKeep 对应的原始 UI 消息（toKeep 是 conversationMsgs 的后缀，
+  // uiMessages 与 conversationMsgs 同序（排除 system），取尾部即可）
+  const keptUiMessages = uiMessages?.filter(m => m.role !== 'system').slice(-toKeep.length)
 
   log('info', `Auto compact: compressing ${toCompress.length} messages, keeping ${toKeep.length} recent`)
 
@@ -292,7 +305,8 @@ export async function autoCompact(
 
     return {
       messages: compactedMessages,
-      info: { beforeTokens, afterTokens, compressedCount: toCompress.length, keptCount: toKeep.length }
+      info: { beforeTokens, afterTokens, compressedCount: toCompress.length, keptCount: toKeep.length },
+      keptUiMessages
     }
   } catch (err) {
     log('error', `Auto compact failed: ${(err as Error).message}`)
@@ -300,7 +314,8 @@ export async function autoCompact(
     log('warn', 'Auto compact: falling back to simple truncation')
     return {
       messages: fallback,
-      info: { beforeTokens: estimateTokens([...systemMsgs, ...conversationMsgs]), afterTokens: estimateTokens(fallback), compressedCount: toCompress.length, keptCount: toKeep.length }
+      info: { beforeTokens: estimateTokens([...systemMsgs, ...conversationMsgs]), afterTokens: estimateTokens(fallback), compressedCount: toCompress.length, keptCount: toKeep.length },
+      keptUiMessages
     }
   }
 }

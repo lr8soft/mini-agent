@@ -194,6 +194,12 @@ export function updateMessageContent(id: string, content: string, status?: strin
   }
 }
 
+/** 删除某会话的全部消息（手动压缩后重建会话历史时使用） */
+export function deleteMessages(sessionId: string): void {
+  db!.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId)
+  touchSession(sessionId)
+}
+
 // ============================================================
 // Settings 操作
 // ============================================================
