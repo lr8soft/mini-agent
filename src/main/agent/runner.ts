@@ -107,7 +107,7 @@ export async function runAgent(
   // Auto Compact: 发送前检查上下文是否超阈值
   if (needsCompact(workingMessages, contextWindow)) {
     log('info', 'Auto compact triggered before sending')
-    const { messages: compacted, info } = await autoCompact(workingMessages, provider, modelOverride)
+    const { messages: compacted, info } = await autoCompact(workingMessages, provider, modelOverride, undefined, contextWindow)
     if (info.compressedCount > 0) {
       cb.onCompact?.(info)
     }
@@ -131,7 +131,7 @@ export async function runAgent(
     // 每轮发送前也检查（工具结果可能很大，导致上下文膨胀）
     if (round > 1 && needsCompact(workingMessages, contextWindow)) {
       log('info', `Auto compact triggered at round ${round}`)
-      const { messages: compacted, info } = await autoCompact(workingMessages, provider, modelOverride)
+      const { messages: compacted, info } = await autoCompact(workingMessages, provider, modelOverride, undefined, contextWindow)
       if (info.compressedCount > 0) {
         cb.onCompact?.(info)
       }

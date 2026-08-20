@@ -14,6 +14,9 @@
 // ============================================================
 import type { ChatMessage } from '../../shared/types'
 
+/** 单条消息的 token 估算函数（由调用方注入，避免 history 依赖 context） */
+export type MessageTokenEstimator = (m: ChatMessage) => number
+
 /**
  * 在 >= minIndex 的位置找一个安全切分点：
  * 切分后 messages[safeIdx..] 作为新序列开头是合法的。
@@ -127,4 +130,45 @@ export function planCompact(
     return { toCompress: [], toKeep: messages }
   }
   return { toCompress: messages.slice(0, idx), toKeep: messages.slice(idx) }
+}
+
+/**
+ * 按 token 预算规划 compact 切分（Cline 风格）：
+ * - 从尾部向前累加 token，直到累计 >= preserveTokenBudget
+ * - 在该位置找安全切分点
+ * - toCompress = 切点之前；toKeep = 切点之后
+ *
+ * 相比 planCompact（按条数），此函数避免"8 条消息可能是 8 个截图(80k tokens)"或
+ * "8 条短消息(只有 2k)"的不可控问题。
+ */
+export function planCompactByTokens(
+  messages: ChatMessage[],
+  preserveTokenBudget: number,
+  estimateMsg: MessageTokenEstimator
+): { toCompress: ChatMessage[]; toKeep: ChatMessage[] } {
+  if (messages.length <= 4) {
+    return { toCompress: [], toKeep: messages }
+  }
+
+  // 从尾部向前累加 token，找到满足预算的最早索引
+  let accumulated = 0
+  let splitIdx = messages.length // 默认：全部保留
+  for (let i = messages.length - 1; i >= 0; i--) {
+    accumulated += estimateMsg(messages[i])
+    splitIdx = i
+    if (accumulated >= preserveTokenBudget) break
+  }
+
+  // 至少保留 2 条消息（防止全部压缩）
+  if (splitIdx >= messages.length - 2) {
+    splitIdx = messages.length - 2
+  }
+
+  // 找安全切分点
+  const safeIdx = splitAtSafeBoundary(messages, splitIdx)
+  if (safeIdx <= 0) {
+    return { toCompress: [], toKeep: messages }
+  }
+
+  return { toCompress: messages.slice(0, safeIdx), toKeep: messages.slice(safeIdx) }
 }

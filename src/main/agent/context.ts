@@ -6,16 +6,34 @@ import { extractTextContent } from '../../shared/multimodal'
 import type { ChatMessage, ProviderConfig, UIMessage } from '../../shared/types'
 import { complete } from '../llm/provider'
 import { log } from '../llm/logger'
-import { planCompact } from './history'
+import { planCompactByTokens } from './history'
 
 // 默认上下文窗口（API 未返回时的 fallback）
 const DEFAULT_CONTEXT_WINDOW = 32768
 
-// 触发 auto compact 的阈值比例（60%）
-const COMPACT_THRESHOLD = 0.6
+// ===== Cline 对齐的压缩常量 =====
+/** 可用输入占比（当模型只报告 context window 时的保守输入比例） */
+const CONTEXT_WINDOW_INPUT_RATIO = 0.9
+/** 触发 auto compact 的比例（相对可用输入预算） */
+const COMPACTION_TRIGGER_RATIO = 0.9
+/** 压缩后保留的最近 token 预算（Cline: 20_000） */
+const DEFAULT_PRESERVE_RECENT_TOKENS = 20_000
+/** 摘要输入中工具结果的字符截断限制（Cline: 2_000） */
+const TOOL_RESULT_CHAR_LIMIT = 2_000
+/** 摘要输入中每条文本的最大字符（防止单条超长消息撑爆摘要 prompt） */
+const MAX_SINGLE_MSG_CHARS = 4_000
 
-// 压缩后保留的最近消息条数
-const KEEP_RECENT_COUNT = 8
+// 计算触发阈值：contextWindow × INPUT_RATIO × TRIGGER_RATIO（= contextWindow × 0.81）
+export function getCompactThreshold(contextWindow: number): number {
+  const usableInput = contextWindow * CONTEXT_WINDOW_INPUT_RATIO
+  return Math.floor(usableInput * COMPACTION_TRIGGER_RATIO)
+}
+
+// 计算保留 token 预算：min(20k, contextWindow × 0.3)
+// 对大窗口（128k+）保留 20k，对小窗口（32k）按比例缩小避免保留过多
+export function getPreserveTokenBudget(contextWindow: number): number {
+  return Math.min(DEFAULT_PRESERVE_RECENT_TOKENS, Math.floor(contextWindow * 0.3))
+}
 
 // 缓存：provider+model → contextWindow
 const contextWindowCache = new Map<string, number>()
@@ -153,52 +171,71 @@ export function getContextWindow(provider: ProviderConfig, modelOverride?: strin
   return DEFAULT_CONTEXT_WINDOW
 }
 
-/**
- * 粗略估算消息列表的 token 数
- * 使用字符数 / 4 作为近似值
- */
-export function estimateTokens(messages: ChatMessage[]): number {
-  let totalChars = 0
-  for (const msg of messages) {
-    totalChars += 16 // 元数据开销
-    if (msg.content) {
-      if (Array.isArray(msg.content)) {
-        // 多模态 content parts（如截图）
-        for (const part of msg.content) {
-          if (part.type === 'text') totalChars += part.text.length
-          else if (part.type === 'image_url') {
-            // base64 图片：粗略估算为 token 数 ≈ base64 长度 / 4（非常粗略，实际取决于模型视觉编码）
-            const url = part.image_url?.url || ''
-            const b64Start = url.indexOf('base64,')
-            totalChars += b64Start >= 0 ? (url.length - b64Start - 7) / 6 : url.length
-          }
+// CJK（中日韩）字符范围：这些字符约 1 token/字，而拉丁字符约 4 字符/token。
+// 用正则计数 CJK 字符，其余按 4 字符/token，避免中文被低估 3-4 倍。
+const CJK_REGEX = /[\u2e80-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af\u3000-\u303f]/g
+
+/** 估算一段纯文本的 token 数（CJK 感知） */
+function estimateTextTokens(text: string): number {
+  const cjkCount = text.match(CJK_REGEX)?.length ?? 0
+  const nonCjkChars = text.length - cjkCount
+  return cjkCount + Math.ceil(nonCjkChars / 4)
+}
+
+/** 估算单条消息的 token 数（CJK 感知） */
+export function estimateMessageTokens(msg: ChatMessage): number {
+  let tokens = 4 // 元数据开销（role/name/分隔符等，约 16 字符 ≈ 4 tokens）
+  if (msg.content) {
+    if (Array.isArray(msg.content)) {
+      // 多模态 content parts（如截图）
+      for (const part of msg.content) {
+        if (part.type === 'text') {
+          tokens += estimateTextTokens(part.text)
+        } else if (part.type === 'image_url') {
+          // base64 图片：粗略估算（沿用原口径 base64 长度 / 24，实际取决于模型视觉编码）
+          const url = part.image_url?.url || ''
+          const b64Start = url.indexOf('base64,')
+          const b64 = b64Start >= 0 ? url.length - b64Start - 7 : url.length
+          tokens += Math.ceil(b64 / 24)
         }
-      } else {
-        totalChars += msg.content.length
       }
-    }
-    if (msg.tool_calls) {
-      for (const tc of msg.tool_calls) {
-        totalChars += (tc.function.name.length + tc.function.arguments.length + 20)
-      }
-    }
-    if (msg.name) {
-      totalChars += msg.name.length
+    } else {
+      tokens += estimateTextTokens(msg.content)
     }
   }
-  return Math.ceil(totalChars / 4)
+  if (msg.tool_calls) {
+    for (const tc of msg.tool_calls) {
+      tokens += estimateTextTokens(tc.function.name) + estimateTextTokens(tc.function.arguments) + 5
+    }
+  }
+  if (msg.name) {
+    tokens += estimateTextTokens(msg.name)
+  }
+  return tokens
+}
+
+/**
+ * 估算消息列表的 token 数（CJK 感知）
+ * 对中文/日文等 CJK 文本按 1 token/字估算，避免 chars/4 的严重低估
+ */
+export function estimateTokens(messages: ChatMessage[]): number {
+  let total = 0
+  for (const m of messages) total += estimateMessageTokens(m)
+  return total
 }
 
 /**
  * 检查是否需要触发 auto compact
+ * 阈值 = contextWindow × INPUT_RATIO(0.9) × TRIGGER_RATIO(0.9) = 81%
+ * （Cline 对齐：先按输入占比算可用预算，再在预算上用触发比例）
  */
 export function needsCompact(
   messages: ChatMessage[],
   contextWindow: number
 ): boolean {
   const used = estimateTokens(messages)
-  const threshold = Math.floor(contextWindow * COMPACT_THRESHOLD)
-  log('info', `Context check: ${used} / ${contextWindow} tokens (${Math.round(used / contextWindow * 100)}%), threshold ${COMPACT_THRESHOLD * 100}%`)
+  const threshold = getCompactThreshold(contextWindow)
+  log('info', `Context check: ${used} / ${threshold} tokens (threshold=${threshold}, window=${contextWindow})`)
   return used >= threshold
 }
 
@@ -213,17 +250,25 @@ export interface CompactResult {
   keptUiMessages?: UIMessage[]
 }
 
+/** 截断超长文本用于摘要输入（Cline: TOOL_RESULT_CHAR_LIMIT） */
+function truncateForSummary(text: string, limit: number): string {
+  if (text.length <= limit) return text
+  return `${text.slice(0, limit)}\n...[truncated ${text.length - limit} chars]`
+}
+
 /**
  * 执行 auto compact：将早期消息压缩为摘要，保留最近 N 条
  *
  * @param uiMessages 可选。与 messages 同源的原始 UI 消息（DB 行，带 id/timestamp），
  *                   用于在压缩后把保留部分原样写回数据库（手动压缩场景）。
+ * @param contextWindow 模型上下文窗口大小，用于计算保留 token 预算
  */
 export async function autoCompact(
   messages: ChatMessage[],
   provider: ProviderConfig,
   modelOverride?: string,
-  uiMessages?: UIMessage[]
+  uiMessages?: UIMessage[],
+  contextWindow?: number
 ): Promise<CompactResult> {
   // 分离 system 消息和对话消息
   const systemMsgs: ChatMessage[] = []
@@ -236,14 +281,15 @@ export async function autoCompact(
     }
   }
 
-  if (conversationMsgs.length <= KEEP_RECENT_COUNT + 2) {
+  if (conversationMsgs.length <= 4) {
     log('info', 'Auto compact: not enough messages to compress')
     return { messages, info: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: conversationMsgs.length } }
   }
 
-  // 安全切分：切点不会落在 assistant(tool_calls) 与其 tool 结果之间，
-  // 否则压缩后重排会产生悬空 tool 消息，LLM API 直接 400
-  const { toCompress, toKeep } = planCompact(conversationMsgs, KEEP_RECENT_COUNT)
+  // 按 token 预算规划切分（Cline 风格）
+  const cw = contextWindow || getContextWindow(provider, modelOverride)
+  const preserveBudget = getPreserveTokenBudget(cw)
+  const { toCompress, toKeep } = planCompactByTokens(conversationMsgs, preserveBudget, estimateMessageTokens)
   if (toCompress.length === 0) {
     log('info', 'Auto compact: no safe boundary to split, skipping')
     return { messages, info: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: conversationMsgs.length } }
@@ -253,7 +299,7 @@ export async function autoCompact(
   // uiMessages 与 conversationMsgs 同序（排除 system），取尾部即可）
   const keptUiMessages = uiMessages?.filter(m => m.role !== 'system').slice(-toKeep.length)
 
-  log('info', `Auto compact: compressing ${toCompress.length} messages, keeping ${toKeep.length} recent`)
+  log('info', `Auto compact: compressing ${toCompress.length} messages, keeping ${toKeep.length} recent (budget=${preserveBudget} tokens)`)
 
   const summaryInput = toCompress.map(m => {
     let text = `[${m.role}]`
@@ -263,10 +309,11 @@ export async function autoCompact(
         // 多模态 content：提取文本部分，图片标记为 [image]
         const imageCount = m.content.filter(part => part.type === 'image_url').length
         const textPart = extractTextContent(m.content)
-        if (textPart) text += `: ${textPart}`
+        if (textPart) text += `: ${truncateForSummary(textPart, m.role === 'tool' ? TOOL_RESULT_CHAR_LIMIT : MAX_SINGLE_MSG_CHARS)}`
         if (imageCount > 0) text += `: [${imageCount} image(s)]`
       } else {
-        text += `: ${m.content}`
+        const limit = m.role === 'tool' ? TOOL_RESULT_CHAR_LIMIT : MAX_SINGLE_MSG_CHARS
+        text += `: ${truncateForSummary(m.content, limit)}`
       }
     }
     if (m.tool_calls && m.tool_calls.length > 0) {

@@ -95,7 +95,7 @@ export default {
       activate: 'Click to activate',
       contextWindow: 'Context Window',
       contextWindowAuto: 'Auto',
-      contextWindowHint: 'Max tokens for the model (0 = auto-detect from API). Auto compact triggers at 60% usage.'
+      contextWindowHint: 'Max tokens for the model (0 = auto-detect from API). Auto compact triggers at 81% usage.'
     },
     mcp: {
       hint: 'Configure MCP (Model Context Protocol) servers for extended tool capabilities.',

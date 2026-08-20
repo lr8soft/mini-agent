@@ -95,7 +95,7 @@ export default {
       activate: '点击切换为当前',
       contextWindow: '上下文窗口',
       contextWindowAuto: '自动',
-      contextWindowHint: '模型最大 token 数（0 = 从 API 自动检测）。上下文使用超过 60% 时自动压缩。'
+      contextWindowHint: '模型最大 token 数（0 = 从 API 自动检测）。上下文使用超过 81% 时自动压缩。'
     },
     mcp: {
       hint: '配置 MCP (Model Context Protocol) 服务器以扩展工具能力。',

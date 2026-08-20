@@ -95,7 +95,7 @@ export default {
       activate: 'Klicken zum Aktivieren',
       contextWindow: 'Kontextfenster',
       contextWindowAuto: 'Auto',
-      contextWindowHint: 'Max. Tokens des Modells (0 = Auto-Erkennung). Auto-Komprimierung bei 60% Nutzung.'
+      contextWindowHint: 'Max. Tokens des Modells (0 = Auto-Erkennung). Auto-Komprimierung bei 81% Nutzung.'
     },
     mcp: {
       hint: 'Konfigurieren Sie MCP-Server (Model Context Protocol) für erweiterte Tool-Fähigkeiten.',

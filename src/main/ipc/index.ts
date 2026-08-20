@@ -7,7 +7,7 @@ import type { AppSettings, ChatMessage, UserMessageInput, AutoApproveMode } from
 import { buildUserContent } from '../../shared/multimodal'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
-import { autoCompact } from '../agent/context'
+import { autoCompact, fetchContextWindow } from '../agent/context'
 import { sanitizeHistory } from '../agent/history'
 import { log } from '../llm/logger'
 import { registerTool, clearTools } from '../tools/registry'
@@ -248,7 +248,8 @@ export function setupIpc(win: BrowserWindow): void {
     })))
 
     try {
-      const { messages: compacted, info, keptUiMessages } = await autoCompact(chatMessages, provider, undefined, uiMessages)
+      const contextWindow = await fetchContextWindow(provider)
+      const { messages: compacted, info, keptUiMessages } = await autoCompact(chatMessages, provider, undefined, uiMessages, contextWindow)
       if (info.compressedCount <= 0) {
         return { ok: true, info }
       }

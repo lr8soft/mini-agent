@@ -2,7 +2,7 @@
 // history.ts 单元测试 — 直接 node 运行（Node 22+ type stripping）
 //   npx tsx tests/history.test.ts  或  node tests/history.test.ts
 // ============================================================
-import { splitAtSafeBoundary, sanitizeHistory, planCompact } from '../src/main/agent/history.ts'
+import { splitAtSafeBoundary, sanitizeHistory, planCompact, planCompactByTokens } from '../src/main/agent/history.ts'
 import type { ChatMessage, ToolCall } from '../src/shared/types.ts'
 
 let passed = 0
@@ -297,6 +297,71 @@ test('planCompact：长序列含工具组 → 正常压缩且 toKeep 合法', ()
   assertEq(validateSequence(toKeep).length, 0, 'toKeep 合法')
   const merged = [...toCompress, ...toKeep]
   assertEq(merged.length, msgs.length, '拼接还原')
+})
+
+// ============================================================
+console.log('\nplanCompactByTokens')
+// ============================================================
+
+/** 测试用 token 估算：content 字符数 / 4（足够稳定即可，不要求精确） */
+const tokenEstimator = (m: ChatMessage): number => {
+  const text = typeof m.content === 'string' ? m.content.length : (m.content ? JSON.stringify(m.content).length : 0)
+  return Math.ceil(text / 4) + 4
+}
+
+test('按 token 预算切分：保留部分 token 接近预算', () => {
+  const msgs: ChatMessage[] = []
+  for (let i = 0; i < 30; i++) {
+    msgs.push(text('user', `第 ${i} 步：执行操作`))
+    msgs.push(assistantWithCalls(tc(`c${i}`, 'read')))
+    msgs.push(toolResult(`c${i}`, 'read', 'X'.repeat(4000))) // ~1000 tokens/条
+  }
+  const { toCompress, toKeep } = planCompactByTokens(msgs, 6000, tokenEstimator)
+  assert(toCompress.length > 0, '有可压缩部分')
+  const keepTokens = toKeep.reduce((s, m) => s + tokenEstimator(m), 0)
+  assert(keepTokens >= 4000, `保留 token 应达到预算量级 (got ${keepTokens})`)
+  assert(keepTokens < 12000, `保留 token 不应远超预算 (got ${keepTokens})`)
+  assertEq(toCompress.length + toKeep.length, msgs.length, '拼接还原')
+  assertEq(validateSequence(toKeep).length, 0, 'toKeep 合法')
+})
+
+test('切点对齐安全边界：不落在 assistant 与其 tool 结果之间', () => {
+  // 预算恰好在某工具组中间 → 应回退到该组 assistant 起点
+  const msgs: ChatMessage[] = []
+  for (let i = 0; i < 20; i++) {
+    msgs.push(text('user', `u${i}`))
+    msgs.push(assistantWithCalls(tc(`c${i}`, 't')))
+    msgs.push(toolResult(`c${i}`, 't', 'Y'.repeat(3000)))
+  }
+  const { toKeep } = planCompactByTokens(msgs, 5000, tokenEstimator)
+  // toKeep 首条不能是孤儿 tool 结果
+  assert(toKeep[0].role !== 'tool', `toKeep 首条不是悬空 tool (got ${toKeep[0].role})`)
+  assertEq(validateSequence(toKeep).length, 0, 'toKeep 合法')
+})
+
+test('消息太少 → 不压缩', () => {
+  const msgs = [text('user', 'hi'), text('assistant', 'hello')]
+  const { toCompress, toKeep } = planCompactByTokens(msgs, 500, tokenEstimator)
+  assertEq(toCompress.length, 0, '无压缩')
+  assertEq(toKeep.length, 2, '全部保留')
+})
+
+test('预算极大 → 全部保留', () => {
+  const msgs = makeLongHistory()
+  const { toCompress, toKeep } = planCompactByTokens(msgs, 10_000_000, tokenEstimator)
+  assertEq(toCompress.length, 0, '无压缩')
+  assertEq(toKeep.length, msgs.length, '全部保留')
+})
+
+test('整个序列是一个并行工具组 → 放弃压缩（切点回退到 0）', () => {
+  const calls = Array.from({ length: 20 }, (_, i) => tc(`c${i}`, `t${i}`))
+  const msgs: ChatMessage[] = [
+    assistantWithCalls(...calls),
+    ...Array.from({ length: 20 }, (_, i) => toolResult(`c${i}`, `t${i}`, 'Z'.repeat(500))),
+  ]
+  const { toCompress, toKeep } = planCompactByTokens(msgs, 5000, tokenEstimator)
+  assertEq(toCompress.length, 0, '放弃压缩')
+  assertEq(toKeep.length, msgs.length, '全部保留')
 })
 
 console.log(`\n${failed === 0 ? '✅' : '❌'} ${passed} passed, ${failed} failed`)
