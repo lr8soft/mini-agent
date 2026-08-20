@@ -1,0 +1,369 @@
+# Zhumora Technical Documentation
+
+This document contains implementation details that are intentionally kept out of the main README.
+
+## 1. Overview
+
+Zhumora is an Electron desktop application built around an LLM tool-calling loop.
+
+The application is split into three runtime boundaries:
+
+- **Electron Main** — LLM providers, agent execution, tools, MCP, storage, memory, and context management
+- **Preload** — controlled IPC bridge exposed through `contextBridge`
+- **Renderer** — React UI and client-side state
+
+The agent can use built-in local tools, browser automation, desktop automation, memory tools, and tools provided by MCP servers.
+
+## 2. Technology stack
+
+| Layer | Technology |
+|---|---|
+| Desktop shell | Electron 43 |
+| Build | electron-vite + Vite 7 + electron-builder |
+| UI | React 19 + TypeScript 5.9 |
+| Styling | Vanilla CSS |
+| State | Zustand |
+| i18n | i18next + react-i18next |
+| LLM transport | Native `fetch`, OpenAI-compatible `/chat/completions`, SSE streaming |
+| Browser automation | Playwright + Chromium |
+| Desktop automation | robotjs |
+| MCP | `@modelcontextprotocol/sdk` |
+| Storage | better-sqlite3 |
+| Skill parsing | gray-matter |
+
+Supported UI languages currently include Chinese, English, Japanese, Spanish, French, and German.
+
+## 3. Runtime architecture
+
+```text
+┌─────────────────────────────────────────────┐
+│                Electron Main                │
+│                                             │
+│  LLM Provider     Agent Runner     MCP      │
+│       │                │            │       │
+│       └──────────┬─────┴─────┬──────┘       │
+│                  │ Tool Registry            │
+│                  │                          │
+│       ┌──────────┴──────────┐               │
+│       │                     │               │
+│  SQLite Store        Context / Memory       │
+│                                             │
+│                 IPC handlers                │
+├─────────────────────────────────────────────┤
+│          Preload / contextBridge            │
+├─────────────────────────────────────────────┤
+│                React Renderer               │
+│                                             │
+│  Sidebar / Chat / Settings / Zustand        │
+└─────────────────────────────────────────────┘
+```
+
+The renderer does not receive unrestricted Electron IPC access. The preload layer exposes a limited application API through `contextBridge`.
+
+## 4. LLM providers
+
+Zhumora uses OpenAI-compatible chat-completions endpoints and SSE streaming.
+
+A provider stores:
+
+- display name
+- base URL
+- API key
+- default model
+- temperature
+- reasoning effort
+- context window
+
+The context window may be configured manually or detected from the provider where supported.
+
+Current auto-detection paths include:
+
+- llama.cpp model metadata exposed through `/v1/models`
+- Ollama model metadata exposed through `/api/show`
+
+A context window value of `0` means auto-detect.
+
+## 5. Agent execution
+
+The core agent follows a ReAct-style tool loop:
+
+```text
+User message
+    │
+    ▼
+LLM request
+    │
+    ├─ no tool calls ─────────────► final response
+    │
+    └─ tool calls
+           │
+           ▼
+      execute tools
+           │
+           ▼
+      append results
+           │
+           └──────────────► next LLM request
+```
+
+The configured default limit is 20 tool rounds per conversation. A value of `0` can be used for no fixed round limit.
+
+Repeated-call loop protection is also implemented:
+
+- repeated calls trigger a warning after 3 occurrences
+- the loop is stopped after 5 occurrences
+- when execution is stopped by the guard, the model is asked to produce a final text-only summary
+
+## 6. Built-in tools
+
+### 6.1 Workspace and shell
+
+Built-in local tools currently include:
+
+- `read`
+- `write`
+- `edit`
+- `bash`
+- `grep`
+- `glob`
+- `ls`
+- `set_title`
+
+File operations are relative to the configured workspace path.
+
+### 6.2 Browser automation
+
+Playwright Chromium is bundled with the application.
+
+Available browser tools currently include:
+
+- `browser_navigate`
+- `browser_click`
+- `browser_type`
+- `browser_screenshot`
+- `browser_get_text`
+- `browser_get_html`
+- `browser_wait`
+- `browser_close`
+
+### 6.3 Desktop automation
+
+Desktop control is implemented with robotjs.
+
+Available desktop tools currently include:
+
+- `desktop_mouse_move`
+- `desktop_mouse_click`
+- `desktop_mouse_drag`
+- `desktop_mouse_scroll`
+- `desktop_key_tap`
+- `desktop_type_text`
+- `desktop_screenshot`
+- `desktop_screen_size`
+- `desktop_get_mouse_pos`
+- `desktop_get_pixel_color`
+
+## 7. Permission model
+
+Tools are divided by risk.
+
+Safe operations can be auto-approved. Potentially dangerous operations require explicit confirmation unless the user enables automatic approval.
+
+The permission layer is part of the agent execution path rather than the renderer itself.
+
+## 8. MCP
+
+Zhumora can mount Model Context Protocol servers and expose their tools to the agent.
+
+Supported transports:
+
+### stdio
+
+Configuration fields:
+
+- command
+- arguments
+- environment variables
+
+Example command:
+
+```text
+npx
+```
+
+Example arguments:
+
+```text
+-y @playwright/mcp@latest
+```
+
+Environment variables use one `KEY=VALUE` entry per line.
+
+### SSE
+
+Remote MCP servers can be configured with an SSE endpoint URL.
+
+## 9. Skills
+
+Skills are Markdown files with frontmatter.
+
+Zhumora parses the frontmatter and Markdown body with `gray-matter`, then injects the skill content into the agent system prompt.
+
+This mechanism is intended for reusable instructions and workflows rather than executable plugins.
+
+## 10. Context management
+
+Before a request is sent to the model, Zhumora estimates context usage.
+
+The current compact threshold is 60% of the configured or detected context window.
+
+When compaction is required:
+
+1. the system message is preserved
+2. the most recent 8 messages are preserved
+3. older messages are summarized by the LLM
+4. the old message range is replaced with the summary
+5. execution continues with the compacted history
+
+The split point is aligned to complete tool-call rounds so an assistant `tool_calls` message is not separated from its tool results.
+
+Current token estimation uses an approximate character-based calculation.
+
+## 11. Long-term memory
+
+Conversation memory is stored locally in SQLite.
+
+Memory categories currently include:
+
+- `preference`
+- `habit`
+- `fact`
+- `skill`
+- `context`
+
+Each entry has an importance value from 1 to 5.
+
+### Retrieval
+
+Before a model call, relevant memories are selected using keyword matching and importance, then injected into the system prompt.
+
+### Extraction
+
+After a conversation completes, the LLM analyzes the conversation and extracts information worth remembering.
+
+Similar memories are deduplicated before insertion.
+
+### Agent-accessible memory tools
+
+The agent can also use:
+
+- `memory_search`
+- `memory_save`
+- `memory_list`
+- `memory_delete`
+
+Memory entries can be viewed, searched, filtered, deleted, and reprioritized in Settings.
+
+## 12. Local storage
+
+Zhumora uses `better-sqlite3`.
+
+The local database stores application data including:
+
+- sessions
+- messages
+- settings
+- memory entries
+- token usage
+
+Token usage is recorded per LLM request and can be summarized per model and by daily usage over the most recent 30 days.
+
+## 13. IPC boundary
+
+Electron Main owns privileged functionality.
+
+Preload exposes a restricted API through `contextBridge`, and the React renderer calls that API instead of importing Electron APIs directly.
+
+This separation is important for:
+
+- context isolation
+- limiting renderer privileges
+- keeping desktop and filesystem operations in the privileged process
+- maintaining a clear TypeScript boundary between Node/Electron code and browser code
+
+## 14. UI state and localization
+
+Renderer state is managed with Zustand.
+
+The UI supports:
+
+- light theme
+- dark theme
+- follow-system theme
+- configurable font size from 13px to 18px
+- automatic system-language detection
+- manual language override
+
+## 15. Development
+
+### Requirements
+
+- Windows 10 / 11
+- Node.js 22.12+
+- Node.js 24 LTS recommended
+- npm
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run development mode:
+
+```bash
+npm run dev
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+Package Windows installer:
+
+```bash
+npm run build:win
+```
+
+The installer is written to `release/`.
+
+## 16. Playwright / Electron install notes
+
+`postinstall` configures the Electron download mirror and installs Playwright Chromium under:
+
+```text
+node_modules/playwright-core/.local-browsers
+```
+
+If Electron downloads are slow on Windows PowerShell, the mirror can be set manually:
+
+```powershell
+$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+npm install
+```
+
+## 17. Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Enter` | Send message |
+| `Shift+Enter` | Insert a new line |
+| `Ctrl+N` | Create a new session |
+
+## 18. Current scope
+
+Zhumora is currently Windows-focused.
+
+The architecture already separates model access, agent execution, browser automation, desktop automation, MCP, memory, storage, and the renderer, so these components can evolve independently without turning the README into an implementation manual.
