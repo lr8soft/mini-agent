@@ -66,6 +66,19 @@ button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 h1, h2, h3, p { margin: 0; }
 
+/* 品牌 logo 为纯黑线条画（透明底），浅色模式直接显示；
+   深色模式下反相成白色线条，保证在深色底上清晰可见。
+   统一覆盖 logo.png 的所有使用处（标题栏 / 侧边栏 / 头像 / 空状态）。 */
+.titlebar-icon, .brand-mark, .assistant-logo, .empty-mark {
+  transition: filter .15s ease;
+}
+:root[data-theme='dark'] .titlebar-icon,
+:root[data-theme='dark'] .brand-mark,
+:root[data-theme='dark'] .assistant-logo,
+:root[data-theme='dark'] .empty-mark {
+  filter: invert(1);
+}
+
 /* ---------- 应用框架 + 窗口标题栏 ---------- */
 .app-frame { width: 100%; height: 100%; display: grid; grid-template-rows: 40px minmax(0, 1fr); overflow: hidden; }
 .window-titlebar {
