@@ -7,6 +7,15 @@ import ChatView from './components/ChatView'
 import SettingsView from './components/SettingsView'
 import PermissionDialog from './components/PermissionDialog'
 
+/** 向某会话的消息缓存追加/更新消息（该会话缓存不存在时自动初始化） */
+function pushMessage(sessionId: string, fn: (msgs: import('@shared/types').UIMessage[]) => import('@shared/types').UIMessage[]) {
+  useAppStore.setState((s) => {
+    const msgs = s.messages[sessionId]
+    if (msgs === undefined) return s
+    return { messages: { ...s.messages, [sessionId]: fn(msgs) } }
+  })
+}
+
 export default function App() {
   const { view, loadSessions, loadSettings, setActiveSession, theme, fontSize } = useAppStore()
 
@@ -27,6 +36,10 @@ export default function App() {
         storeLanguage(lang)
         i18n.changeLanguage(effective)
       }
+    })
+    // 恢复运行状态（渲染进程重启 / 刷新后，main 进程里仍在跑的会话继续显示转圈）
+    window.api.agent.running().then(ids => {
+      for (const id of ids) useAppStore.getState().markRunning(id, true)
     })
   }, [])
 
@@ -50,125 +63,229 @@ export default function App() {
   }, [fontSize])
 
   // 注册 IPC 事件
+  // 核心原则：所有 agent 事件都携带 sessionId 并按会话路由 ——
+  // 事件落在对应会话的消息缓存里（后台会话照常累积），
+  // 只有"当前显示会话"的状态变化才会引起界面刷新，从而会话之间互不串台。
   useEffect(() => {
     const unsubs = [
-      // 流式 token → 更新消息
+      // 流式 token → 精确路由到 messageId 对应的消息（占位消息收到首 token 即转为流式）
       window.api.agent.onToken(({ sessionId, messageId, token }) => {
-        useAppStore.setState((s) => {
-          if (s.activeSessionId !== sessionId) return s
-          const msgs = [...s.messages]
-          const last = msgs[msgs.length - 1]
-          // append 到最后一条 assistant 消息（但不是 tool_call 消息）
-          if (last && last.role === 'assistant' && !last.toolCalls?.length) {
-            // append 到最后一条 assistant 消息（思考占位 / 流式消息），占位收到首 token 即转为流式
-            msgs[msgs.length - 1] = { ...last, content: last.content + token, status: 'streaming' }
-          } else {
-            msgs.push({
+        const msgs = useAppStore.getState().messages[sessionId]
+        if (msgs === undefined) return
+        const idx = msgs.findIndex(m => m.id === messageId)
+        if (idx >= 0) {
+          pushMessage(sessionId, (m) => m.map((x, i) =>
+            i === idx ? { ...x, content: x.content + token, status: 'streaming' as const } : x
+          ))
+          return
+        }
+        // 兜底：assistant 消息事件丢失时，append 到最后一条可流式的 assistant 消息
+        const last = msgs[msgs.length - 1]
+        if (last && last.role === 'assistant' && (last.status === 'thinking' || last.status === 'streaming')) {
+          pushMessage(sessionId, (m) => {
+            const next = [...m]
+            next[next.length - 1] = { ...last, content: last.content + token, status: 'streaming' as const }
+            return next
+          })
+          return
+        }
+        // 再兜底：新建一条流式消息
+        pushMessage(sessionId, (m) => [...m, {
+          id: messageId || `stream-${Date.now()}`,
+          sessionId,
+          role: 'assistant' as const,
+          content: token,
+          timestamp: Date.now(),
+          status: 'streaming' as const
+        }])
+      }),
+
+      // assistant 消息事件（phase=start：本轮开始，替换 thinking 占位为流式消息；
+      // phase=end：本轮结束，把流式消息收尾为 done）。
+      // 工具行不在此渲染（onToolCall 事件负责，避免重复）；
+      // 纯工具调用且无文本的轮次不创建空气泡。
+      window.api.agent.onAssistantMessage(({ sessionId, messageId, content, phase }) => {
+        const msgs = useAppStore.getState().messages[sessionId]
+        if (msgs === undefined) return
+        pushMessage(sessionId, (m) => {
+          if (phase === 'start') {
+            // 把 thinking 占位替换为正式流式消息（无占位时直接追加）
+            const idx = m.findIndex(x => x.status === 'thinking')
+            if (idx >= 0) {
+              const next = [...m]
+              next[idx] = {
+                id: messageId,
+                sessionId,
+                role: 'assistant' as const,
+                content: '',
+                timestamp: Date.now(),
+                status: 'streaming' as const
+              }
+              return next
+            }
+            if (m.some(x => x.id === messageId)) return m
+            return [...m, {
               id: messageId,
               sessionId,
-              role: 'assistant',
-              content: token,
+              role: 'assistant' as const,
+              content: '',
               timestamp: Date.now(),
-              status: 'streaming'
-            })
+              status: 'streaming' as const
+            }]
           }
-          return { messages: msgs, streamingMessageId: messageId }
+          // phase === 'end'
+          const existingIdx = m.findIndex(x => x.id === messageId)
+          if (existingIdx >= 0) {
+            const finalContent = content || m[existingIdx].content
+            // 纯工具轮（无任何文本）：start 时创建的空流式气泡直接移除，
+            // 工具行由 onToolCall 事件渲染，避免留下空气泡
+            if (!finalContent) return m.filter((_, i) => i !== existingIdx)
+            // 流式消息收尾
+            const updated = [...m]
+            updated[existingIdx] = {
+              ...updated[existingIdx],
+              content: finalContent,
+              status: 'done' as const
+            }
+            return updated
+          }
+          if (!content) return m
+          return [...m, {
+            id: messageId,
+            sessionId,
+            role: 'assistant' as const,
+            content,
+            timestamp: Date.now(),
+            status: 'done' as const
+          }]
         })
       }),
 
-      // 工具调用
-      window.api.agent.onToolCall(({ toolCall }) => {
-        useAppStore.setState((s) => {
-          const msgs = [...s.messages]
-          // 首个响应是工具调用（无文本）→ 移除思考占位
-          const thinkingIdx = msgs.findIndex(m => m.status === 'thinking')
-          if (thinkingIdx >= 0) msgs.splice(thinkingIdx, 1)
-          msgs.push({
-            id: `tc-${Date.now()}`,
-            sessionId: s.activeSessionId || '',
-            role: 'assistant',
+      // 工具调用 → 插入到对应会话（不再依赖 activeSessionId，后台会话同样累积）
+      window.api.agent.onToolCall(({ sessionId, toolCall }) => {
+        pushMessage(sessionId, (m) => {
+          const next = m.filter(x => x.status !== 'thinking')
+          next.push({
+            id: `tc-${toolCall.id || Date.now()}`,
+            sessionId,
+            role: 'assistant' as const,
             content: '',
             toolCalls: [toolCall],
             timestamp: Date.now(),
-            status: 'pending'
+            status: 'pending' as const
           })
-          return { messages: msgs }
+          return next
         })
       }),
 
-      // 工具结果
-      window.api.agent.onToolResult(({ toolCallId, toolName, result, isError }) => {
-        useAppStore.setState((s) => {
-          const msgs = [...s.messages]
-          msgs.push({
-            id: `tr-${Date.now()}`,
-            sessionId: s.activeSessionId || '',
-            role: 'tool',
-            content: result,
-            toolCallId,
-            toolName,
-            timestamp: Date.now(),
-            status: isError ? 'error' : 'done'
-          })
-          return { messages: msgs }
-        })
+      // 工具结果 → 插入到对应会话
+      window.api.agent.onToolResult(({ sessionId, toolCallId, toolName, result, isError }) => {
+        pushMessage(sessionId, (m) => [...m, {
+          id: `tr-${toolCallId}-${Date.now()}`,
+          sessionId,
+          role: 'tool' as const,
+          content: result,
+          toolCallId,
+          toolName,
+          timestamp: Date.now(),
+          status: isError ? ('error' as const) : ('done' as const)
+        }])
       }),
 
-      // 对话完成
+      // 对话完成 → 该会话退出运行态；若正显示该会话则刷新完整数据库记录
       window.api.agent.onComplete(({ sessionId }) => {
-        const { activeSessionId } = useAppStore.getState()
-        if (activeSessionId === sessionId) {
-          useAppStore.setState({ isRunning: false, streamingMessageId: null, retryStatus: null })
-          // 重新加载消息获取完整数据库记录
-          useAppStore.getState().loadMessages(sessionId)
+        const st = useAppStore.getState()
+        st.markRunning(sessionId, false)
+        st.setRetryStatus(sessionId, null)
+        const reqs = { ...st.permissionRequests }
+        delete reqs[sessionId]
+        useAppStore.setState({ permissionRequests: reqs })
+        if (st.activeSessionId === sessionId) {
+          void st.loadMessages(sessionId)
         }
-        useAppStore.getState().loadSessions()
+        void st.loadSessions()
       }),
 
-      // 错误
-      window.api.agent.onError(({ sessionId, error }) => {
-        const { activeSessionId } = useAppStore.getState()
-        if (activeSessionId === sessionId) {
-          useAppStore.setState((s) => ({
-            isRunning: false,
-            streamingMessageId: null,
-            retryStatus: null,
-            // 重试耗尽报错后，移除思考占位
-            messages: s.messages.filter(m => m.status !== 'thinking')
-          }))
+      // 错误 → 该会话退出运行态；错误消息已由 main 存入 DB
+      window.api.agent.onError(({ sessionId }) => {
+        const st = useAppStore.getState()
+        st.markRunning(sessionId, false)
+        st.setRetryStatus(sessionId, null)
+        const reqs = { ...st.permissionRequests }
+        delete reqs[sessionId]
+        useAppStore.setState({ permissionRequests: reqs })
+        if (st.activeSessionId === sessionId) {
+          void st.loadMessages(sessionId)
         }
+        void st.loadSessions()
       }),
 
-      // 网络重试状态
+      // 用户中止 → 该会话退出运行态
+      window.api.agent.onAborted(({ sessionId }) => {
+        const st = useAppStore.getState()
+        st.markRunning(sessionId, false)
+        st.setRetryStatus(sessionId, null)
+        if (st.activeSessionId === sessionId) {
+          // 移除可能残留的思考占位，刷新 DB 记录
+          pushMessage(sessionId, (m) => m.filter(x => x.status !== 'thinking'))
+          void st.loadMessages(sessionId)
+        }
+        void st.loadSessions()
+      }),
+
+      // 运行状态变化（main 进程权威：开始/结束运行）
+      window.api.agent.onRunningChange(({ sessionId, running }) => {
+        useAppStore.getState().markRunning(sessionId, running)
+      }),
+
+      // 网络重试状态（按会话）
       window.api.agent.onRetry(({ sessionId, failedAttempt, maxRetries }) => {
-        const { activeSessionId } = useAppStore.getState()
-        if (activeSessionId === sessionId) {
-          useAppStore.setState({ retryStatus: { failedAttempt, maxRetries } })
+        useAppStore.getState().setRetryStatus(sessionId, { failedAttempt, maxRetries })
+      }),
+
+      // 权限请求（按会话存入；UI 按 FIFO 显示，不影响其他并行会话）
+      window.api.agent.onPermissionRequest(({ sessionId, permId, toolName, args, level }) => {
+        useAppStore.setState((s) => ({
+          permissionRequests: { ...s.permissionRequests, [sessionId]: { permId, sessionId, toolName, args, level } }
+        }))
+      }),
+
+      // 上下文压缩通知（按会话；仅当当前显示该会话时展示提示）
+      window.api.agent.onCompact(({ sessionId, source, beforeTokens, afterTokens, compressedCount, keptCount }) => {
+        const st = useAppStore.getState()
+        if (st.activeSessionId === sessionId) {
+          useAppStore.setState((s) => ({
+            compactNotices: {
+              ...s.compactNotices,
+              [sessionId]: { beforeTokens, afterTokens, compressedCount, keptCount }
+            }
+          }))
+          setTimeout(() => {
+            useAppStore.setState((s) => {
+              const rest = { ...s.compactNotices }
+              delete rest[sessionId]
+              return { compactNotices: rest }
+            })
+          }, 8000)
+          // 仅手动压缩会重建 DB 历史 → 刷新消息缓存。
+          // 自动压缩发生在运行中，只影响 LLM 工作上下文，此时刷新会冲掉流式中的 UI 状态。
+          if (source === 'manual') {
+            void st.loadMessages(sessionId)
+          }
+        }
+        if (source === 'manual') {
+          void st.loadSessions()
         }
       }),
 
-      // 权限请求
-      window.api.agent.onPermissionRequest(({ sessionId, permId, toolName, args, level }) => {
-        useAppStore.setState({ permissionRequest: { permId, sessionId, toolName, args, level } })
-      }),
+      // 静默消费日志
+      window.api.onLog(() => {}),
 
-      // 上下文压缩通知
-      window.api.agent.onCompact(({ sessionId, beforeTokens, afterTokens, compressedCount, keptCount }) => {
-        if (sessionId !== useAppStore.getState().activeSessionId) return
-        useAppStore.setState({ compactNotice: { beforeTokens, afterTokens, compressedCount, keptCount } })
-        // 8 秒后自动消失
-        setTimeout(() => {
-          useAppStore.setState({ compactNotice: null })
-        }, 8000)
-      }),
-
-      // 标题更新
-      window.api.onLog(() => {}), // 静默消费日志
-
+      // 会话标题更新（LLM 自动命名）
       window.api.onSessionTitleUpdated(({ sessionId, title }) => {
         useAppStore.setState((s) => ({
-          sessions: s.sessions.map(s =>
-            s.id === sessionId ? { ...s, title } : s
+          sessions: s.sessions.map(x =>
+            x.id === sessionId ? { ...x, title } : x
           )
         }))
       })
@@ -192,7 +309,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* 权限确认弹窗 */}
+      {/* 权限确认弹窗（多会话并行时按 FIFO 逐个确认） */}
       <PermissionDialog />
     </div>
   )

@@ -13,6 +13,7 @@ export default {
     newSession: 'Nueva sesión',
     noSessions: 'Sin sesiones',
     deleteSession: 'Eliminar sesión',
+    running: 'En ejecución',
     settings: 'Configuración'
   },
   chat: {
@@ -52,6 +53,7 @@ export default {
   permission: {
     title: 'Solicitud de Permiso',
     description: 'El agente quiere ejecutar una herramienta que requiere confirmación:',
+    fromSession: 'Esta solicitud es de la sesión: {{title}}',
     titleDangerous: 'Operación Peligrosa',
     descriptionDangerous: 'El agente quiere realizar una operación de alto riesgo (control de escritorio / eliminación de archivos, etc.). Revisa los argumentos cuidadosamente:',
     levelDangerous: 'PELIGROSO',

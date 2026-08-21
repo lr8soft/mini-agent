@@ -13,6 +13,7 @@ export default {
     newSession: 'Nouvelle session',
     noSessions: 'Aucune session',
     deleteSession: 'Supprimer la session',
+    running: 'En cours',
     settings: 'Paramètres'
   },
   chat: {
@@ -52,6 +53,7 @@ export default {
   permission: {
     title: 'Demande de Permission',
     description: "L'agent veut exécuter un outil qui nécessite une confirmation :",
+    fromSession: "Cette demande provient de la session : {{title}}",
     titleDangerous: 'Opération Dangereuse',
     descriptionDangerous: "L'agent veut effectuer une opération à haut risque (contrôle du bureau / suppression de fichiers, etc.). Veuillez examiner les arguments attentivement :",
     levelDangerous: 'DANGEREUX',

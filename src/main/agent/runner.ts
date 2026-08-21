@@ -13,6 +13,7 @@ import { sanitizeHistory } from './history'
 import { extractTextContent } from '../../shared/multimodal'
 import { LoopDetector, DEFAULT_LOOP_CONFIG, type LoopDetectionConfig } from './loopDetector'
 import { getSettings } from '../store/db'
+import { AgentAbortedError } from '../../shared/types'
 
 export const DEFAULT_MAX_TOOL_ROUNDS = 20
 
@@ -139,6 +140,10 @@ export async function runAgent(
       workingMessages.push(...compacted)
     }
 
+    // 轮间中止检查：provider 层对用户中止按"部分内容正常完成"处理，
+    // 若不显式抛出，agent 会带着部分回复继续下一轮 / 执行工具
+    if (signal?.aborted) throw new AgentAbortedError()
+
     const tools = getAllTools()
     const model = modelOverride || provider.defaultModel
     const { content, toolCalls, usage } = await streamChat(provider, {
@@ -157,6 +162,14 @@ export async function runAgent(
     // 回传 token 用量
     if (usage) {
       cb.onTokenUsage?.(usage, model)
+    }
+
+    // 中止检查：provider 层对"用户中止"按部分内容正常返回（不抛错）。
+    // 若不在此拦截，agent 会把部分回复当完整结果、继续执行工具调用。
+    // 先落盘已生成的部分文本，再抛中止错误（IPC 层据此通知前端该会话已停止）。
+    if (signal?.aborted) {
+      if (content) cb.onAssistantMessage?.(content, [])
+      throw new AgentAbortedError()
     }
 
     cb.onAssistantMessage?.(content, toolCalls)
@@ -196,6 +209,21 @@ export async function runAgent(
       let resultText = ''
       let isError = false
       let durationMs = 0
+
+      // 中止短路：用户按 Stop 后本轮剩余工具不再执行（占位结果保证消息序列合法）。
+      // 下一轮 while 顶部的 signal 检查会抛出 AgentAbortedError 结束本次运行。
+      if (signal?.aborted) {
+        resultText = 'Execution skipped: aborted by user'
+        isError = true
+        cb.onToolResult?.(tc.id, tc.function.name, resultText, true, 0)
+        workingMessages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          name: tc.function.name,
+          content: resultText
+        })
+        continue
+      }
 
       if (!toolEntry) {
         resultText = `Error: Tool "${tc.function.name}" not found`

@@ -4,7 +4,7 @@
 // ============================================================
 import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import type { AppSettings, ChatMessage, UserMessageInput, AutoApproveMode } from '../../shared/types'
-import { COMPACT_SUMMARY_PREFIX } from '../../shared/types'
+import { COMPACT_SUMMARY_PREFIX, AgentAbortedError } from '../../shared/types'
 import { buildUserContent } from '../../shared/multimodal'
 import * as db from '../store/db'
 import { runAgent, setSkillsPromptGetter } from '../agent/runner'
@@ -27,8 +27,18 @@ let mainWindow: BrowserWindow | null = null
 // 活跃的 abort 控制器，按 sessionId 区分
 const abortControllers = new Map<string, AbortController>()
 
-// 权限回调队列（按 permId 等待用户响应）
-const pendingPermissions = new Map<string, { resolve: (ok: boolean) => void }>()
+/** 正在运行的会话集合（与 abortControllers 同步维护；状态是进程内易失的，不入库） */
+const runningSessions = new Set<string>()
+
+function setRunning(sessionId: string, running: boolean): void {
+  if (running) runningSessions.add(sessionId)
+  else runningSessions.delete(sessionId)
+  // 通知渲染进程刷新侧边栏的运行指示（多个会话并行时各自独立转圈）
+  mainWindow?.webContents.send('agent:running', { sessionId, running })
+}
+
+// 权限回调队列（按 permId 等待用户响应；记录所属会话以便按会话清理）
+const pendingPermissions = new Map<string, { sessionId: string; resolve: (ok: boolean) => void }>()
 
 // 批准模式（按 sessionId 动态存储，运行中可实时切换）
 const approveModeMap = new Map<string, AutoApproveMode>()
@@ -113,7 +123,12 @@ export function setupIpc(win: BrowserWindow): void {
   // ============================================================
   // Agent 对话
   // ============================================================
-  ipcMain.handle('agent:run', async (e, sessionId: string, userMessage: UserMessageInput, options?: { providerId?: string; modelOverride?: string; approveMode?: AutoApproveMode }) => {
+  ipcMain.handle('agent:run', (e, sessionId: string, userMessage: UserMessageInput, options?: { providerId?: string; modelOverride?: string; approveMode?: AutoApproveMode }) => {
+    // 同一会话同一时刻只允许一个运行（UI 已禁用运行中的输入；这里是防御性检查）。
+    // 不同会话之间完全并行，互不阻塞。
+    if (runningSessions.has(sessionId)) {
+      return { error: 'This session already has a running agent.' }
+    }
     // 只接受合法的 data URL 图片（渲染进程已过滤，这里二次防御）
     const inputImages = (userMessage.images || []).filter(u => typeof u === 'string' && u.startsWith('data:image/'))
     // 初始化批准模式（renderer 传入的值作为初始值，之后通过 agent:set-approve-mode 动态更新）
@@ -154,6 +169,10 @@ export function setupIpc(win: BrowserWindow): void {
       name: m.toolName
     })))
 
+    // 获取 session 的工作目录（优先用 session 的，没有再用 settings 的默认值）
+    const session = db.getSession(sessionId)
+    const workspacePath = session?.workspacePath || settings.workspacePath
+
     // 构建回调（流式 token / 工具调用 / DB 持久化）
     const { callbacks } = buildAgentCallbacks(sessionId, e.sender)
 
@@ -167,51 +186,75 @@ export function setupIpc(win: BrowserWindow): void {
 
     const abortController = new AbortController()
     abortControllers.set(sessionId, abortController)
+    setRunning(sessionId, true)
 
-    try {
-      // 获取 session 的工作目录（优先用 session 的，没有再用 settings 的默认值）
-      const session = db.getSession(sessionId)
-      const workspacePath = session?.workspacePath || settings.workspacePath
-
-      await runAgent(
-        {
-          messages: chatMessages,
-          provider,
-          workspacePath,
-          sessionId,
-          permissionCheck,
-          signal: abortController.signal,
-          modelOverride: options?.modelOverride,
-          memoryEnabled: settings.memoryEnabled !== false,
-          maxRounds: settings.maxRounds,
-          onSessionTitleUpdate: (sid, title) => {
-            mainWindow?.webContents.send('session:title_updated', { sessionId: sid, title })
-          }
-        },
-        callbacks
-      )
-      return { ok: true }
-    } catch (err) {
-      const msg = (err as Error).message
-      // 错误已在 onError 回调中存入 DB，这里只返回错误信息
-      return { error: msg }
-    } finally {
+    // fire-and-forget：立即返回 ok，agent 在后台独立运行。
+    // 多个会话可以各自同时跑；结果通过 agent:complete / agent:error /
+    // agent:aborted 事件 + 事件流推送给渲染进程（opencode 同款模式）。
+    void runAgent(
+      {
+        messages: chatMessages,
+        provider,
+        workspacePath,
+        sessionId,
+        permissionCheck,
+        signal: abortController.signal,
+        modelOverride: options?.modelOverride,
+        memoryEnabled: settings.memoryEnabled !== false,
+        maxRounds: settings.maxRounds,
+        onSessionTitleUpdate: (sid, title) => {
+          mainWindow?.webContents.send('session:title_updated', { sessionId: sid, title })
+        }
+      },
+      callbacks
+    ).catch((err) => {
+      if (err instanceof AgentAbortedError) {
+        // 用户主动中止：错误回调不会触发（provider 层按部分内容正常完成），
+        // 这里显式通知前端该会话已停止
+        e.sender.send('agent:aborted', { sessionId })
+        return
+      }
+      log('error', `agent:run unhandled (sessionId=${sessionId}): ${err instanceof Error ? err.message : String(err)}`)
+      // onError 回调已把错误存入 DB 并广播 agent:error
+    }).finally(() => {
       abortControllers.delete(sessionId)
-      approveModeMap.delete(sessionId)
-    }
+      setRunning(sessionId, false)
+      // 清理该会话的悬挂权限请求（以 false resolve，避免内存泄漏）
+      for (const [permId, pending] of [...pendingPermissions]) {
+        if (pending.sessionId === sessionId) {
+          pending.resolve(false)
+          pendingPermissions.delete(permId)
+        }
+      }
+      // 注意：不删除 approveModeMap —— 会话的批准模式需跨运行保留，
+      // 运行中切换的模式在下次运行时直接生效
+    })
+
+    return { ok: true }
   })
 
-  // 中止当前对话
+  // 查询正在运行的会话集合（渲染进程启动时恢复侧边栏运行指示；状态是进程内易失的）
+  ipcMain.handle('agent:running', () => {
+    return [...runningSessions]
+  })
+
+  // 中止某个会话的运行（只影响该会话，其他会话继续并行执行）
   ipcMain.handle('agent:abort', (_e, sessionId: string) => {
     const ctrl = abortControllers.get(sessionId)
     if (ctrl) {
       ctrl.abort()
       abortControllers.delete(sessionId)
+      setRunning(sessionId, false)
+      // 立即通知前端该会话已停止（runAgent 的 finally 也会清理一次，幂等）
+      mainWindow?.webContents.send('agent:aborted', { sessionId })
     }
-    // 清理该会话的悬挂权限请求（以 false resolve，避免内存泄漏）
-    for (const [permId, pending] of pendingPermissions) {
-      pending.resolve(false)
-      pendingPermissions.delete(permId)
+    // 只清理该会话的悬挂权限请求（以 false resolve，避免内存泄漏；
+    // 其他并行会话的权限弹窗不受影响）
+    for (const [permId, pending] of [...pendingPermissions]) {
+      if (pending.sessionId === sessionId) {
+        pending.resolve(false)
+        pendingPermissions.delete(permId)
+      }
     }
     return true
   })
@@ -271,8 +314,8 @@ export function setupIpc(win: BrowserWindow): void {
       for (const m of keptUiMessages || []) {
         db.addMessage(m)
       }
-      // 通知前端展示压缩提示
-      e.sender.send('agent:compact', { sessionId, ...info })
+      // 通知前端展示压缩提示（source=manual：DB 历史已重建，前端需刷新消息）
+      e.sender.send('agent:compact', { sessionId, source: 'manual', ...info })
       log('info', `Manual compact done: sessionId=${sessionId}, ${info.beforeTokens} → ${info.afterTokens} tokens`)
       return { ok: true, info }
     } catch (err) {

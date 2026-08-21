@@ -4,17 +4,17 @@ import ReactMarkdown from 'react-markdown'
 import { ChevronDown, ChevronUp, Terminal, Wrench, XCircle, Archive } from 'lucide-react'
 import type { UIMessage, ToolCall } from '@shared/types'
 import { COMPACT_SUMMARY_PREFIX } from '@shared/types'
-import { useAppStore } from '../store'
 
 interface Props {
   message: UIMessage
   /** 工具调用状态（按 toolCall.id 索引，由 ChatView 计算） */
   toolStatuses?: Record<string, 'done' | 'error'>
+  /** 当前会话的重试状态（按会话传入，避免后台并行会话的状态串到前台） */
+  retryStatus?: { failedAttempt: number; maxRetries: number }
 }
 
-export default function MessageBubble({ message, toolStatuses }: Props) {
+export default function MessageBubble({ message, toolStatuses, retryStatus }: Props) {
   const { t } = useTranslation()
-  const retryStatus = useAppStore(s => s.retryStatus)
 
   // 上下文压缩摘要消息：以 user 角色存库，但渲染为可折叠的系统摘要块（默认收起）
   if (message.role === 'user' && typeof message.content === 'string' && message.content.startsWith(COMPACT_SUMMARY_PREFIX)) {

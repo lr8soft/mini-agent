@@ -1,8 +1,15 @@
 // ============================================================
 // Zustand Store — 渲染进程全局状态
+//
+// 会话隔离设计（对齐 opencode / Cline 的做法）：
+// - 消息按会话缓存（messages: Record<sessionId, UIMessage[]>），
+//   后台会话的流式事件照常累积，切回时立即可见，互不串台
+// - 运行状态按会话独立（runningIds: Set<sessionId>），
+//   多个会话可同时并行运行 Agent
+// - 重试 / 权限请求 / 压缩通知同样按会话隔离
 // ============================================================
 import { create } from 'zustand'
-import type { Session, UIMessage, AppSettings, ToolCall, AutoApproveMode } from '@shared/types'
+import type { Session, UIMessage, AppSettings, AutoApproveMode } from '@shared/types'
 
 const api = window.api
 
@@ -42,7 +49,7 @@ function getStoredApproveMode(): AutoApproveMode {
   }
 }
 
-interface PermissionRequest {
+export interface PermissionRequest {
   permId: string
   sessionId: string
   toolName: string
@@ -50,6 +57,22 @@ interface PermissionRequest {
   /** 工具权限等级（用于 UI 展示不同警告强度） */
   level?: string
 }
+
+interface RetryStatus {
+  failedAttempt: number
+  maxRetries: number
+}
+
+interface CompactNotice {
+  beforeTokens: number
+  afterTokens: number
+  compressedCount: number
+  keptCount: number
+  error?: string
+}
+
+/** loadMessages 进行中的去重（避免同一会话的并发拉取互相覆盖） */
+const loadingMessages = new Map<string, Promise<void>>()
 
 interface AppState {
   // 视图
@@ -71,15 +94,16 @@ interface AppState {
   createSession: () => Promise<void>
   deleteSession: (id: string) => Promise<void>
 
-  // 消息
-  messages: UIMessage[]
+  // 消息 — 按会话缓存（sessionId → 消息数组），未打开过的会话没有缓存
+  messages: Record<string, UIMessage[]>
   loadMessages: (sessionId: string) => Promise<void>
 
-  // Agent 状态
-  isRunning: boolean
-  streamingMessageId: string | null
-  /** LLM 网络重试状态（null = 未在重试）；maxRetries = -1 表示无限 */
-  retryStatus: { failedAttempt: number; maxRetries: number } | null
+  // Agent 状态 — 按会话隔离，支持多会话并行
+  runningIds: Set<string>
+  markRunning: (sessionId: string, running: boolean) => void
+  /** LLM 网络重试状态（按会话；无条目 = 该会话未在重试）；maxRetries = -1 表示无限 */
+  retryStatus: Record<string, RetryStatus>
+  setRetryStatus: (sessionId: string, status: RetryStatus | null) => void
 
   // 模型选择 — 格式为 "providerId::modelName"，null 则用 active provider 默认模型
   selectedProviderModel: string | null
@@ -89,12 +113,13 @@ interface AppState {
   approveMode: AutoApproveMode
   setApproveMode: (v: AutoApproveMode) => void
 
-  // 权限
-  permissionRequest: PermissionRequest | null
+  // 权限 — 按会话隔离（多个并行会话可能同时弹窗，UI 按 FIFO 逐个确认）
+  permissionRequests: Record<string, PermissionRequest>
+  respondPermission: (allowed: boolean) => void
 
-  // 上下文压缩通知（显示后自动消失）
-  compactNotice: { beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number; error?: string } | null
-  /** 手动压缩进行中（点击"压缩上下文"后为 true，完成/失败后为 false） */
+  // 上下文压缩通知（按会话，显示后自动消失）
+  compactNotices: Record<string, CompactNotice>
+  /** 手动压缩进行中（显式用户操作，全局一次一个即可） */
   isCompacting: boolean
 
   // 设置
@@ -104,8 +129,8 @@ interface AppState {
 
   // Agent 操作
   sendMessage: (text: string, images?: string[]) => Promise<void>
+  /** 中止当前活跃会话的运行 */
   abortAgent: () => void
-  respondPermission: (allowed: boolean) => void
   /** 手动压缩当前会话上下文（运行中不可用） */
   compactNow: () => Promise<void>
 }
@@ -126,7 +151,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeSessionId: null,
   setActiveSession: (id) => {
     set({ activeSessionId: id })
-    get().loadMessages(id)
+    // 缓存未命中才拉取（后台会话的消息由事件流持续累积，切回无需重拉）
+    if (id && get().messages[id] === undefined) {
+      void get().loadMessages(id)
+    }
   },
   loadSessions: async () => {
     const sessions = await api.session.list()
@@ -137,32 +165,71 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({
       sessions: [session, ...s.sessions],
       activeSessionId: session.id,
-      messages: []
+      messages: { ...s.messages, [session.id]: [] }
     }))
   },
   deleteSession: async (id) => {
+    // 会话运行中 → 先停止（避免孤儿运行继续写库）
+    if (get().runningIds.has(id)) {
+      api.agent.abort(id)
+      get().markRunning(id, false)
+      get().setRetryStatus(id, null)
+      set((s) => {
+        const reqs = { ...s.permissionRequests }
+        delete reqs[id]
+        return { permissionRequests: reqs }
+      })
+    }
     await api.session.delete(id)
     const { sessions, activeSessionId } = get()
     const newSessions = sessions.filter(s => s.id !== id)
     const newActiveId = activeSessionId === id
       ? (newSessions[0]?.id || null)
       : activeSessionId
-    set({ sessions: newSessions, activeSessionId: newActiveId })
-    if (newActiveId) get().loadMessages(newActiveId)
-    else set({ messages: [] })
+    set((s) => {
+      const messages = { ...s.messages }
+      delete messages[id]
+      return { sessions: newSessions, activeSessionId: newActiveId, messages }
+    })
+    if (newActiveId) void get().loadMessages(newActiveId)
   },
 
-  // ---- 消息 ----
-  messages: [],
-  loadMessages: async (sessionId) => {
-    const messages = await api.session.messages(sessionId)
-    set({ messages })
+  // ---- 消息（按会话缓存） ----
+  messages: {},
+  loadMessages: (sessionId) => {
+    const inflight = loadingMessages.get(sessionId)
+    if (inflight) return inflight
+    const p = (async () => {
+      try {
+        const msgs = await api.session.messages(sessionId)
+        set((s) => ({ messages: { ...s.messages, [sessionId]: msgs } }))
+      } finally {
+        loadingMessages.delete(sessionId)
+      }
+    })()
+    loadingMessages.set(sessionId, p)
+    return p
   },
 
-  // ---- Agent ----
-  isRunning: false,
-  streamingMessageId: null,
-  retryStatus: null,
+  // ---- Agent 运行状态（按会话，支持并行） ----
+  runningIds: new Set<string>(),
+  markRunning: (sessionId, running) => {
+    set((s) => {
+      const runningIds = new Set(s.runningIds)
+      if (running) runningIds.add(sessionId)
+      else runningIds.delete(sessionId)
+      return { runningIds }
+    })
+  },
+  retryStatus: {},
+  setRetryStatus: (sessionId, status) => {
+    set((s) => {
+      const retryStatus = { ...s.retryStatus }
+      if (status) retryStatus[sessionId] = status
+      else delete retryStatus[sessionId]
+      return { retryStatus }
+    })
+  },
 
   // ---- 模型选择 ----
   selectedProviderModel: null,
@@ -173,7 +240,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setApproveMode: (v) => {
     set({ approveMode: v })
     try { localStorage.setItem('zhumora.approveMode', v) } catch { /* ignore */ }
-    // 同步到 main 进程（如果当前会话正在运行中，即时生效）
+    // 同步到 main 进程（该会话若正在运行中，即时生效）
     const { activeSessionId } = get()
     if (activeSessionId) {
       api.agent.setApproveMode(activeSessionId, v)
@@ -186,31 +253,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().createSession()
       activeSessionId = get().activeSessionId!
     }
+    const sid = activeSessionId
+    if (!sid) return
+    // 该会话正在运行 → 不允许重入（其他会话不受影响，可并行）
+    if (get().runningIds.has(sid)) return
 
-    // 添加用户消息到 UI
+    // 添加用户消息 + 思考占位消息（发送后立即显示"思考中 + 转圈动画"）
     const userMsg: UIMessage = {
       id: `local-${Date.now()}`,
-      sessionId: activeSessionId,
+      sessionId: sid,
       role: 'user',
       content: text,
       images: images && images.length > 0 ? images : undefined,
       timestamp: Date.now(),
       status: 'done'
     }
-    // 思考占位消息：发送后立即在聊天区显示"思考中 + 转圈动画"
     const thinkingMsg: UIMessage = {
-      id: `thinking-${Date.now()}`,
-      sessionId: activeSessionId,
+      id: `thinking-${sid}-${Date.now()}`,
+      sessionId: sid,
       role: 'assistant',
       content: '',
       timestamp: Date.now(),
       status: 'thinking'
     }
     set((s) => ({
-      messages: [...s.messages, userMsg, thinkingMsg],
-      isRunning: true,
-      streamingMessageId: null,
-      retryStatus: null
+      messages: { ...s.messages, [sid]: [...(s.messages[sid] || []), userMsg, thinkingMsg] }
     }))
 
     try {
@@ -226,44 +293,50 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
 
-      const result = await api.agent.run(activeSessionId, { text, images }, {
+      const result = await api.agent.run(sid, { text, images }, {
         providerId,
         modelOverride,
         approveMode: get().approveMode
       })
       if (result.error) {
-        set((s) => ({
-          messages: [
-            ...s.messages.filter(m => m.status !== 'thinking'),
-            {
-              id: `err-${Date.now()}`,
-              sessionId: activeSessionId!,
-              role: 'assistant',
-              content: `Error: ${result.error}`,
-              timestamp: Date.now(),
-              status: 'error'
+        // 启动失败（如未配置 provider）：移除思考占位，追加错误消息
+        set((s) => {
+          const msgs = (s.messages[sid] || []).filter(m => m.status !== 'thinking')
+          return {
+            messages: {
+              ...s.messages,
+              [sid]: [...msgs, {
+                id: `err-${Date.now()}`,
+                sessionId: sid,
+                role: 'assistant' as const,
+                content: `Error: ${result.error}`,
+                timestamp: Date.now(),
+                status: 'error' as const
+              }]
             }
-          ],
-          isRunning: false,
-          retryStatus: null
-        }))
-      }
-    } catch (err) {
-      set((s) => ({
-        messages: [
-          ...s.messages.filter(m => m.status !== 'thinking'),
-          {
-            id: `err-${Date.now()}`,
-            sessionId: activeSessionId!,
-            role: 'assistant',
-            content: `Error: ${(err as Error).message}`,
-            timestamp: Date.now(),
-            status: 'error'
           }
-        ],
-        isRunning: false,
-        retryStatus: null
-      }))
+        })
+        return
+      }
+      // 运行状态由 main 进程的 agent:running 事件权威驱动（事件先于 invoke 响应到达，
+      // 无需在这里乐观标记 —— 避免"运行已快速失败但 UI 仍显示 running"的竞态）
+    } catch (err) {
+      set((s) => {
+        const msgs = (s.messages[sid] || []).filter(m => m.status !== 'thinking')
+        return {
+          messages: {
+            ...s.messages,
+            [sid]: [...msgs, {
+              id: `err-${Date.now()}`,
+              sessionId: sid,
+              role: 'assistant' as const,
+              content: `Error: ${(err as Error).message}`,
+              timestamp: Date.now(),
+              status: 'error' as const
+            }]
+          }
+        }
+      })
     }
   },
 
@@ -271,45 +344,59 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { activeSessionId } = get()
     if (activeSessionId) {
       api.agent.abort(activeSessionId)
-      set({ isRunning: false, streamingMessageId: null })
+      get().markRunning(activeSessionId, false)
+      get().setRetryStatus(activeSessionId, null)
     }
   },
 
+  // ---- 权限（按会话 FIFO 处理） ----
+  permissionRequests: {},
   respondPermission: (allowed: boolean) => {
-    const { permissionRequest } = get()
-    if (permissionRequest) {
-      api.agent.respondPermission(permissionRequest.permId, allowed)
-      set({ permissionRequest: null })
+    // 多个并行会话可能同时有弹窗 → 按 permId 生成顺序（FIFO）处理最早的
+    const reqs = Object.values(get().permissionRequests)
+      .sort((a, b) => a.permId.localeCompare(b.permId))
+    const req = reqs[0]
+    if (req) {
+      api.agent.respondPermission(req.permId, allowed)
+      set((s) => {
+        const rest = { ...s.permissionRequests }
+        delete rest[req.sessionId]
+        return { permissionRequests: rest }
+      })
     }
   },
+
+  // ---- 上下文压缩通知 ----
+  compactNotices: {},
+  isCompacting: false,
 
   compactNow: async () => {
-    const { activeSessionId, isRunning, isCompacting } = get()
-    if (!activeSessionId || isRunning || isCompacting) return
+    const { activeSessionId, runningIds, isCompacting } = get()
+    if (!activeSessionId || runningIds.has(activeSessionId) || isCompacting) return
+    const sid = activeSessionId
     set({ isCompacting: true })
     try {
-      const res = await api.agent.compactNow(activeSessionId)
+      const res = await api.agent.compactNow(sid)
       if (res.error) {
         console.error('Manual compact error:', res.error)
         // 失败提示：复用压缩通知条（红色错误态），几秒后自动消失
-        set({ compactNotice: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: 0, error: res.error } })
-        setTimeout(() => set({ compactNotice: null }), 6000)
+        set((s) => ({ compactNotices: { ...s.compactNotices, [sid]: { beforeTokens: 0, afterTokens: 0, compressedCount: 0, keptCount: 0, error: res.error } } }))
+        setTimeout(() => {
+          set((s) => {
+            const rest = { ...s.compactNotices }
+            delete rest[sid]
+            return { compactNotices: rest }
+          })
+        }, 6000)
         return
       }
       // 主进程压缩成功后会广播 agent:compact → App.tsx 设置 compactNotice 展示提示
-      // 这里刷新消息列表：早期消息已被摘要替换
-      await get().loadMessages(activeSessionId)
+      // 这里刷新消息缓存：早期消息已被摘要替换
+      await get().loadMessages(sid)
     } finally {
       set({ isCompacting: false })
     }
   },
-
-  // ---- 权限 ----
-  permissionRequest: null,
-
-  // ---- 上下文压缩通知 ----
-  compactNotice: null,
-  isCompacting: false,
 
   // ---- 设置 ----
   settings: {

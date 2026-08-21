@@ -13,6 +13,7 @@ export default {
     newSession: '新しいセッション',
     noSessions: 'セッションがありません',
     deleteSession: 'セッションを削除',
+    running: '実行中',
     settings: '設定'
   },
   chat: {
@@ -52,6 +53,7 @@ export default {
   permission: {
     title: '権限リクエスト',
     description: 'エージェントが確認が必要なツールを実行しようとしています：',
+    fromSession: 'このリクエストの送信元セッション：{{title}}',
     titleDangerous: '危険な操作の確認',
     descriptionDangerous: 'エージェントが高リスク操作（デスクトップ制御/ファイル削除など）を実行しようとしています。引数を慎重に確認してください：',
     levelDangerous: '危険',

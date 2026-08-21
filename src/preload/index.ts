@@ -49,10 +49,13 @@ const api = {
   // Agent 对话
   // ============================================================
   agent: {
-    /** 发送消息并启动 agent 运行 */
-    run: (sessionId: string, message: UserMessageInput, options?: { providerId?: string; modelOverride?: string; approveMode?: AutoApproveMode }): Promise<{ ok?: boolean; error?: string; assistantMessageId?: string }> =>
+    /** 发送消息并启动 agent 运行（立即返回；agent 在后台独立运行，多个会话可并行） */
+    run: (sessionId: string, message: UserMessageInput, options?: { providerId?: string; modelOverride?: string; approveMode?: AutoApproveMode }): Promise<{ ok?: boolean; error?: string }> =>
       ipcRenderer.invoke('agent:run', sessionId, message, options),
-    /** 中止当前运行 */
+    /** 查询正在运行的会话 ID 列表（用于启动时恢复侧边栏运行指示） */
+    running: (): Promise<string[]> =>
+      ipcRenderer.invoke('agent:running'),
+    /** 中止某个会话的运行（不影响其他并行会话） */
     abort: (sessionId: string): Promise<boolean> =>
       ipcRenderer.invoke('agent:abort', sessionId),
     /** 动态切换批准模式（运行中即时生效） */
@@ -70,6 +73,28 @@ const api = {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('agent:token', handler)
       return () => ipcRenderer.removeListener('agent:token', handler)
+    },
+    /**
+     * assistant 消息事件（流式 token 会携带此 messageId，用于精确路由到对应消息）
+     * phase='start'：本轮 LLM 开始输出（UI 把 thinking 占位替换为流式消息）
+     * phase='end'：本轮结束已落库（UI 把流式消息收尾为 done）
+     */
+    onAssistantMessage: (cb: (data: { sessionId: string; messageId: string; content: string; toolCalls: any[]; phase: 'start' | 'end' }) => void) => {
+      const handler = (_e: any, data: any) => cb(data)
+      ipcRenderer.on('agent:assistant_message', handler)
+      return () => ipcRenderer.removeListener('agent:assistant_message', handler)
+    },
+    /** 某个会话被中止（用户按 Stop） */
+    onAborted: (cb: (data: { sessionId: string }) => void) => {
+      const handler = (_e: any, data: any) => cb(data)
+      ipcRenderer.on('agent:aborted', handler)
+      return () => ipcRenderer.removeListener('agent:aborted', handler)
+    },
+    /** 运行状态变化（某会话开始/结束运行） */
+    onRunningChange: (cb: (data: { sessionId: string; running: boolean }) => void) => {
+      const handler = (_e: any, data: any) => cb(data)
+      ipcRenderer.on('agent:running', handler)
+      return () => ipcRenderer.removeListener('agent:running', handler)
     },
     onToolCall: (cb: (data: { sessionId: string; toolCall: any }) => void) => {
       const handler = (_e: any, data: any) => cb(data)
@@ -101,7 +126,8 @@ const api = {
       ipcRenderer.on('agent:permission_request', handler)
       return () => ipcRenderer.removeListener('agent:permission_request', handler)
     },
-    onCompact: (cb: (data: { sessionId: string; beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number }) => void) => {
+    /** source=auto：运行中自动压缩（DB 未变，不刷新消息）；source=manual：手动压缩（DB 历史已重建） */
+    onCompact: (cb: (data: { sessionId: string; source: 'auto' | 'manual'; beforeTokens: number; afterTokens: number; compressedCount: number; keptCount: number }) => void) => {
       const handler = (_e: any, data: any) => cb(data)
       ipcRenderer.on('agent:compact', handler)
       return () => ipcRenderer.removeListener('agent:compact', handler)

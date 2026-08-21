@@ -4,7 +4,13 @@ import { useAppStore } from '../store'
 
 export default function Sidebar() {
   const { t } = useTranslation()
-  const { sessions, activeSessionId, setActiveSession, createSession, deleteSession, setView, view } = useAppStore()
+  const sessions = useAppStore(s => s.sessions)
+  const activeSessionId = useAppStore(s => s.activeSessionId)
+  // 运行中的会话集合（多个会话可并行运行，各自独立转圈）
+  const runningIds = useAppStore(s => s.runningIds)
+  const view = useAppStore(s => s.view)
+  // actions 引用稳定，从 getState 取（避免整 store 订阅导致流式期间高频重渲染）
+  const { setActiveSession, createSession, deleteSession, setView } = useAppStore.getState()
 
   return (
     <aside className="sidebar">
@@ -25,23 +31,29 @@ export default function Sidebar() {
         {sessions.length === 0 && (
           <p className="sidebar-empty">{t('sidebar.noSessions')}</p>
         )}
-        {sessions.map((s) => (
-          <button
-            key={s.id}
-            className={s.id === activeSessionId ? 'active' : ''}
-            onClick={() => setActiveSession(s.id)}
-          >
-            <MessageSquare size={15} />
-            <span className="session-title">{s.title}</span>
-            <span
-              className="session-delete"
-              title={t('sidebar.deleteSession')}
-              onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
+        {sessions.map((s) => {
+          const running = runningIds.has(s.id)
+          return (
+            <button
+              key={s.id}
+              className={s.id === activeSessionId ? 'active' : ''}
+              title={running ? t('sidebar.running') : undefined}
+              onClick={() => setActiveSession(s.id)}
             >
-              <Trash2 size={12} />
-            </span>
-          </button>
-        ))}
+              {running
+                ? <span className="session-spinner" />
+                : <MessageSquare size={15} />}
+              <span className="session-title">{s.title}</span>
+              <span
+                className="session-delete"
+                title={t('sidebar.deleteSession')}
+                onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
+              >
+                <Trash2 size={12} />
+              </span>
+            </button>
+          )
+        })}
       </nav>
 
       {/* 底部设置入口 */}

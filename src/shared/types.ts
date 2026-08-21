@@ -130,6 +130,19 @@ export interface SkillConfig {
   enabled: boolean
 }
 
+/**
+ * 用户主动中止（Stop）时由 Agent runner 抛出。
+ * provider 层对"用户中止"按部分内容正常完成处理（不抛错、不重试），
+ * 因此 runner 在每轮之间显式检查 signal 并抛出本错误，
+ * 让 IPC 层把该会话标记为已停止并通知前端（避免状态卡死）。
+ */
+export class AgentAbortedError extends Error {
+  constructor() {
+    super('Aborted')
+    this.name = 'AgentAbortedError'
+  }
+}
+
 /** 工具调用批准模式（三档）
  * - manual: 手动批准 — safe 放行，normal + dangerous 都弹窗
  * - auto:   自动批准 — safe + normal 放行，dangerous 弹窗

@@ -4,11 +4,20 @@ import { FolderOpen, ImagePlus, Send, Shield, ShieldCheck, ShieldOff, Square, X,
 import { processImageFile, ImageAttachmentError, MAX_IMAGES } from '../utils/image'
 import { useAppStore } from '../store'
 import MessageBubble from './MessageBubble'
-import type { AutoApproveMode } from '@shared/types'
+import type { AutoApproveMode, UIMessage } from '@shared/types'
+
+const EMPTY_MESSAGES: UIMessage[] = []
 
 export default function ChatView() {
   const { t } = useTranslation()
-  const { messages, isRunning, retryStatus, sendMessage, abortAgent, activeSessionId, sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, compactNotice, isCompacting, compactNow } = useAppStore()
+  const activeSessionId = useAppStore(s => s.activeSessionId)
+  // 按会话切片订阅：只有"当前显示会话"的数据变化才触发重渲染，
+  // 后台并行会话的消息累积不会干扰当前视图
+  const messages = useAppStore(s => (activeSessionId ? (s.messages[activeSessionId] ?? EMPTY_MESSAGES) : EMPTY_MESSAGES))
+  const isRunning = useAppStore(s => (activeSessionId ? s.runningIds.has(activeSessionId) : false))
+  const retryStatus = useAppStore(s => (activeSessionId ? s.retryStatus[activeSessionId] : undefined))
+  const compactNotice = useAppStore(s => (activeSessionId ? s.compactNotices[activeSessionId] : undefined))
+  const { sessions, settings, selectedProviderModel, setSelectedProviderModel, approveMode, setApproveMode, isCompacting, sendMessage, abortAgent, compactNow } = useAppStore()
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -290,7 +299,7 @@ export default function ChatView() {
             </div>
           )}
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} toolStatuses={toolStatuses} />
+            <MessageBubble key={msg.id} message={msg} toolStatuses={toolStatuses} retryStatus={retryStatus} />
           ))}
           {/* 重试状态行（思考占位已被移除时显示，如工具轮之间的重试） */}
           {retryStatus && isRunning && !messages.some(m => m.status === 'thinking') && (

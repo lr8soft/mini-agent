@@ -23,16 +23,29 @@ export function buildAgentCallbacks(
   sender: Electron.WebContents
 ): {
   callbacks: AgentEventCallbacks
-  getStreamingMsgId: () => string | null
-  getStreamingContent: () => string
 } {
   let streamingMsgId: string | null = null
   let streamingContent = ''
+  /** 当前 LLM 轮次的 messageId（每轮独立：onAssistantMessage 在轮结束时调用，
+   *  会重置并开启下一轮） */
+  let roundMsgId: string | null = null
+
+  /** 确保当前轮已有 messageId：无则生成并广播 assistant 消息事件
+   *  （UI 据此把 thinking 占位替换为正式流式消息，后续 token 精确路由到该消息）。
+   *  在首个 token 之前就发出，解决旧实现"token 的 messageId 滞后一轮"的串台问题。 */
+  const ensureRoundMsgId = (): string => {
+    if (!roundMsgId) {
+      roundMsgId = genId()
+      sender.send('agent:assistant_message', { sessionId, messageId: roundMsgId, content: '', toolCalls: [], phase: 'start' })
+    }
+    return roundMsgId
+  }
 
   const callbacks: AgentEventCallbacks = {
     onToken: (token) => {
       streamingContent += token
-      sender.send('agent:token', { sessionId, messageId: streamingMsgId || '', token })
+      // token 携带当前轮 messageId → UI 精确路由，多会话并行不串台
+      sender.send('agent:token', { sessionId, messageId: ensureRoundMsgId(), token })
     },
     onToolCall: (toolCall) => {
       sender.send('agent:tool_call', { sessionId, toolCall })
@@ -52,19 +65,25 @@ export function buildAgentCallbacks(
       sender.send('agent:tool_result', { sessionId, toolCallId, toolName, result, isError, durationMs })
     },
     onAssistantMessage: (content, toolCalls) => {
-      const msgId = genId()
-      const msg = {
-        id: msgId,
-        sessionId,
-        role: 'assistant' as const,
-        content: content || '',
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-        timestamp: Date.now(),
-        status: 'done' as const
+      // 本轮结束：复用流式 token 的 messageId 落库（纯工具轮无文本时不落空消息）
+      if (content || toolCalls.length > 0) {
+        const msgId = ensureRoundMsgId()
+        db.addMessage({
+          id: msgId,
+          sessionId,
+          role: 'assistant' as const,
+          content: content || '',
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          timestamp: Date.now(),
+          status: 'done' as const
+        })
       }
-      db.addMessage(msg)
-      streamingMsgId = msgId
+      streamingMsgId = roundMsgId
       streamingContent = content || ''
+      // 开启下一轮（下一轮 token 会用新的 messageId）
+      roundMsgId = null
+      // 通知前端：本轮 assistant 消息已收尾（UI 据此把流式消息置为 done）
+      sender.send('agent:assistant_message', { sessionId, messageId: streamingMsgId || '', content, toolCalls, phase: 'end' })
     },
     onTokenUsage: (usage: TokenUsage, model: string) => {
       db.addTokenUsage({
@@ -92,12 +111,24 @@ export function buildAgentCallbacks(
       sender.send('agent:complete', { sessionId, messageId: streamingMsgId || '', content: streamingContent })
     },
     onError: (error) => {
-      if (!streamingMsgId) {
+      const errMsg = `Error: ${error.message}`
+      if (roundMsgId) {
+        // 本轮已开始流式（尚未落库）→ 以本轮 messageId 存错误消息（保留部分文本）
+        db.addMessage({
+          id: roundMsgId,
+          sessionId,
+          role: 'assistant',
+          content: streamingContent ? `${streamingContent}\n\n${errMsg}` : errMsg,
+          timestamp: Date.now(),
+          status: 'error'
+        })
+      } else if (!streamingMsgId) {
+        // 还没开始任何一轮 → 存一条错误消息
         db.addMessage({
           id: genId(),
           sessionId,
           role: 'assistant',
-          content: streamingContent || `Error: ${error.message}`,
+          content: errMsg,
           timestamp: Date.now(),
           status: 'error'
         })
@@ -108,14 +139,13 @@ export function buildAgentCallbacks(
       sender.send('agent:retry', { sessionId, failedAttempt, maxRetries })
     },
     onCompact: (info) => {
-      sender.send('agent:compact', { sessionId, ...info })
+      // source=auto：agent 运行中的自动压缩（只影响 LLM 工作上下文，DB 未变）
+      sender.send('agent:compact', { sessionId, source: 'auto', ...info })
     }
   }
 
   return {
-    callbacks,
-    getStreamingMsgId: () => streamingMsgId,
-    getStreamingContent: () => streamingContent
+    callbacks
   }
 }
 
@@ -134,7 +164,7 @@ export function buildPermissionCheck(
   sessionId: string,
   approveModeGetter: () => AutoApproveMode,
   sender: Electron.WebContents,
-  pendingPermissions: Map<string, { resolve: (ok: boolean) => void }>
+  pendingPermissions: Map<string, { sessionId: string; resolve: (ok: boolean) => void }>
 ): (toolName: string, args: Record<string, unknown>) => Promise<boolean> {
   return async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
     const level: PermissionLevel = getToolPermission(toolName)
@@ -161,7 +191,7 @@ export function buildPermissionCheck(
     const permId = genId()
     log('info', `Permission dialog needed: tool=${toolName}, level=${level}, mode=${mode}, permId=${permId}`)
     return new Promise<boolean>((resolve) => {
-      pendingPermissions.set(permId, { resolve })
+      pendingPermissions.set(permId, { sessionId, resolve })
       sender.send('agent:permission_request', {
         sessionId, permId, toolName, args, level
       })

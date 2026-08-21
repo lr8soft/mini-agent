@@ -291,7 +291,34 @@ This separation is important for:
 - keeping desktop and filesystem operations in the privileged process
 - maintaining a clear TypeScript boundary between Node/Electron code and browser code
 
-## 14. UI state and localization
+## 14. Concurrent sessions
+
+Multiple sessions can run the agent at the same time. Session isolation follows the
+pattern used by Cline and opencode:
+
+- **Main process is the authority.** `agent:run` is fire-and-forget: it returns
+  `{ ok: true }` immediately and the agent loop runs in the background. One run per
+  session at a time (per-session guard), unlimited cross-session concurrency.
+  `agent:running` exposes the set of active session IDs so the renderer can restore
+  state after a reload (running state is process-local, not persisted).
+- **Every event carries `sessionId` and is routed per session.** The renderer keeps a
+  per-session message cache (`Record<sessionId, UIMessage[]>`); background sessions
+  keep accumulating stream events even while another session is displayed, so switching
+  back shows live progress. UI components subscribe only to the active session's slice.
+- **Per-round message IDs.** Before the first token of an LLM round, the main process
+  emits `agent:assistant_message { phase: 'start' }` with a fresh messageId; all tokens
+  of that round carry it, and `phase: 'end'` finalizes the message. This makes token
+  routing exact (no "append to last message" guessing) even with concurrent sessions
+  and multi-round tool loops.
+- **Per-session UI state.** Running indicators, retry status, permission requests, and
+  compact notices are all keyed by sessionId. The sidebar shows a spinner for every
+  running session; permission dialogs for non-active sessions show which session they
+  belong to (confirmed FIFO). Stop / abort only affects the targeted session.
+- **Abort semantics.** `agent:abort` cancels only that session's run. The agent loop
+  checks the abort signal between rounds and after each LLM stream, persisting partial
+  text and emitting `agent:aborted` so the renderer clears the session's running state.
+
+## 15. UI state and localization
 
 Renderer state is managed with Zustand.
 
@@ -304,7 +331,7 @@ The UI supports:
 - automatic system-language detection
 - manual language override
 
-## 15. Development
+## 16. Development
 
 ### Requirements
 
@@ -339,7 +366,7 @@ npm run build:win
 
 The installer is written to `release/`.
 
-## 16. Playwright / Electron install notes
+## 17. Playwright / Electron install notes
 
 `postinstall` configures the Electron download mirror and installs Playwright Chromium under:
 
@@ -354,7 +381,7 @@ $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 npm install
 ```
 
-## 17. Keyboard shortcuts
+## 18. Keyboard shortcuts
 
 | Shortcut | Action |
 |---|---|
@@ -362,7 +389,7 @@ npm install
 | `Shift+Enter` | Insert a new line |
 | `Ctrl+N` | Create a new session |
 
-## 18. Current scope
+## 19. Current scope
 
 Zhumora is currently Windows-focused.
 
