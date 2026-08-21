@@ -293,20 +293,27 @@ export async function runAgent(
         }
       }
 
-      // 对于截图结果，传给前端/DB 的是精简文本，避免 base64 爆炸
-      const isImageResult = !isError && resultText.startsWith('__IMAGE_BASE64__:')
+      // 截图结果可能混在文本中（desktop 工具 after=true 时：动作文本 + 截图 marker），
+      // 用正则提取 base64 段；传给前端/DB 的只剩文本，避免 base64 爆炸
+      const imgMatch = !isError ? resultText.match(/__IMAGE_BASE64__:\s*([A-Za-z0-9+/=]+)/) : null
+      const isImageResult = !!imgMatch
+      const imageBase64 = imgMatch ? imgMatch[1] : ''
+      const imageTextPart = imgMatch ? resultText.replace(/\n?__IMAGE_BASE64__:[A-Za-z0-9+/=]+/, '').trim() : ''
       const displayResult = isImageResult
-        ? 'Screenshot captured (image sent to LLM for visual analysis)'
+        ? imageTextPart
+          ? `${imageTextPart}\n[screenshot attached, sent to LLM for visual analysis]`
+          : 'Screenshot captured (image sent to LLM for visual analysis)'
         : resultText
       cb.onToolResult?.(tc.id, tc.function.name, displayResult, isError, durationMs)
 
       // 追加 tool 消息 — 如果结果是 base64 图片，组装为 OpenAI 多模态格式
       if (isImageResult) {
-        const base64 = resultText.slice('__IMAGE_BASE64__:'.length)
-        const imageContent: ContentPart[] = [
-          { type: 'text', text: 'Screenshot captured.' },
-          { type: 'image_url', image_url: { url: `data:image/png;base64,${base64}`, detail: 'auto' } }
-        ]
+        const imageContent: ContentPart[] = []
+        if (imageTextPart) imageContent.push({ type: 'text', text: imageTextPart })
+        imageContent.push({
+          type: 'image_url',
+          image_url: { url: `data:image/png;base64,${imageBase64}`, detail: 'auto' }
+        })
         workingMessages.push({
           role: 'tool',
           tool_call_id: tc.id,

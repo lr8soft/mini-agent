@@ -1,414 +1,264 @@
 // ============================================================
-// 桌面控制工具集 — RobotJS (鼠标/键盘) + Electron desktopCapturer (截屏)
-// 工具: desktop_mouse_move / desktop_mouse_click / desktop_mouse_drag /
-//       desktop_mouse_scroll / desktop_key_tap / desktop_type_text /
-//       desktop_screenshot / desktop_screen_size / desktop_get_mouse_pos /
-//       desktop_get_pixel_color
+// 桌面控制工具集 — 单一原子工具 `desktop`（对齐 Claude computer-use 模式）
+//
+// 设计要点（参考 Anthropic computer-use / Open Interpreter / UI-TARS）：
+// 1. 单一工具 + action 枚举：click/drag 一步完成"移动+点击"，
+//    不再需要 move → screenshot → click 的多轮交互。
+// 2. 坐标空间契约：LLM 输出的坐标 = 它上次看到的 screenshot 图像上的像素，
+//    物理屏幕像素的换算由本模块完成（HiDPI 缩放下模型无法准确输出物理坐标，
+//    这是"挪不到位"的根因）。
+// 3. 截图固定缩放到 ≤1280px 宽（对齐 vision 模型舒适区，省 token），
+//    并在文本中同时报告图像尺寸与物理屏幕尺寸。
+// 4. 动作类 action 可带 after=true，执行后自动附带一张新截图，
+//    省掉模型"动作→截图确认"的额外回合。
+// 5. 输入/截图都走 robotjs（moveMouse/mouseClick/keyTap/screen.capture）。
+//    截图的缩放+PNG 编码在 desktopImage.ts（纯 JS，可单测）。
 // ============================================================
-import { desktopCapturer, screen as electronScreen } from 'electron'
 import robot from 'robotjs'
 import type { ToolHandler } from './registry'
+import { resizeBgraToPngBase64, type RawBgraImage } from './desktopImage'
 
-// ============================================================
-// 鼠标工具
-// ============================================================
+export const DESKTOP_TOOL_NAME = 'desktop'
 
-// ---- desktop_mouse_move ----
-export const desktopMouseMoveTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_mouse_move',
-      description: 'Move the mouse cursor to the specified screen coordinates. Use smooth mode for visual feedback.',
-      parameters: {
-        type: 'object',
-        properties: {
-          x: { type: 'number', description: 'Target X coordinate (pixels, 0 = left edge)' },
-          y: { type: 'number', description: 'Target Y coordinate (pixels, 0 = top edge)' },
-          smooth: { type: 'boolean', description: 'If true, move smoothly with animation (default: false)' },
-          speed: { type: 'number', description: 'Movement speed in pixels/second when smooth=true (default: 1000)' }
-        },
-        required: ['x', 'y']
-      }
-    }
-  },
-  permission: 'dangerous',
-  async execute(args) {
-    const x = Math.round(args.x as number)
-    const y = Math.round(args.y as number)
-    const smooth = (args.smooth as boolean) || false
-    const speed = (args.speed as number) || 1000
-    try {
-      if (smooth) {
-        // moveMouseSmooth(x, y, speed?) — speed is pixels per second
-        robot.moveMouseSmooth(x, y, speed)
-      } else {
-        robot.moveMouse(x, y)
-      }
-      return `Mouse moved to (${x}, ${y})${smooth ? ' smoothly' : ''}`
-    } catch (err) {
-      return `Error moving mouse: ${(err as Error).message}`
-    }
-  }
-}
+/** 上一次截图的图像尺寸。LLM 坐标以此为基准空间；未截图前默认 1:1。 */
+let lastImageSize = { width: 0, height: 0 }
 
-// ---- desktop_mouse_click ----
-export const desktopMouseClickTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_mouse_click',
-      description: 'Click the mouse at current position or at specified coordinates. Supports left/right/middle button and double-click.',
-      parameters: {
-        type: 'object',
-        properties: {
-          button: { type: 'string', enum: ['left', 'right', 'middle'], description: 'Mouse button (default: left)' },
-          double: { type: 'boolean', description: 'If true, perform a double-click (default: false)' },
-          x: { type: 'number', description: 'Optional X coordinate — if provided, mouse moves here before clicking' },
-          y: { type: 'number', description: 'Optional Y coordinate — if provided, mouse moves here before clicking' }
-        }
-      }
-    }
-  },
-  permission: 'dangerous',
-  async execute(args) {
-    const button = (args.button as 'left' | 'right' | 'middle') || 'left'
-    const double = (args.double as boolean) || false
-    const x = args.x !== undefined ? Math.round(args.x as number) : null
-    const y = args.y !== undefined ? Math.round(args.y as number) : null
-    try {
-      if (x !== null && y !== null) {
-        robot.moveMouse(x, y)
-      }
-      // mouseClick(button?, double?) — both params optional
-      robot.mouseClick(button, double)
-      const pos = robot.getMousePos()
-      return `Clicked ${button}${double ? ' (double)' : ''} at (${pos.x}, ${pos.y})`
-    } catch (err) {
-      return `Error clicking mouse: ${(err as Error).message}`
-    }
-  }
-}
-
-// ---- desktop_mouse_drag ----
-export const desktopMouseDragTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_mouse_drag',
-      description: 'Drag the mouse from current position to target coordinates with a button held down. Useful for drag-and-drop operations.',
-      parameters: {
-        type: 'object',
-        properties: {
-          x: { type: 'number', description: 'Target X coordinate to drag to' },
-          y: { type: 'number', description: 'Target Y coordinate to drag to' },
-          button: { type: 'string', enum: ['left', 'right', 'middle'], description: 'Button to hold during drag (default: left)' }
-        },
-        required: ['x', 'y']
-      }
-    }
-  },
-  permission: 'dangerous',
-  async execute(args) {
-    const x = Math.round(args.x as number)
-    const y = Math.round(args.y as number)
-    const button = (args.button as 'left' | 'right' | 'middle') || 'left'
-    try {
-      // dragMouse(x, y, button?) — drags from current pos to (x,y) with button pressed
-      // robotjs 的 d.ts 缺少 button 参数（运行时实际支持），此处做类型断言
-      ;(robot.dragMouse as (x: number, y: number, button?: string) => void)(x, y, button)
-      return `Dragged mouse to (${x}, ${y}) with ${button} button`
-    } catch (err) {
-      return `Error dragging mouse: ${(err as Error).message}`
-    }
-  }
-}
-
-// ---- desktop_mouse_scroll ----
-export const desktopMouseScrollTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_mouse_scroll',
-      description: 'Scroll the mouse wheel at the current position. Positive Y scrolls down, negative Y scrolls up. Positive X scrolls right, negative X scrolls left.',
-      parameters: {
-        type: 'object',
-        properties: {
-          x: { type: 'number', description: 'Horizontal scroll amount (positive=right, negative=left, 0=none)' },
-          y: { type: 'number', description: 'Vertical scroll amount (positive=down, negative=up, 0=none)' }
-        },
-        required: ['y']
-      }
-    }
-  },
-  permission: 'dangerous',
-  async execute(args) {
-    const xAmt = Math.round(args.x as number) || 0
-    const yAmt = Math.round(args.y as number)
-    try {
-      // scrollMouse(x, y) — horizontal and vertical scroll amounts
-      robot.scrollMouse(xAmt, yAmt)
-      return `Scrolled (x=${xAmt}, y=${yAmt})`
-    } catch (err) {
-      return `Error scrolling: ${(err as Error).message}`
-    }
-  }
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 // ============================================================
-// 键盘工具
+// 坐标换算
 // ============================================================
 
-// ---- desktop_key_tap ----
-export const desktopKeyTapTool: ToolHandler = {
+/**
+ * 缩放比例 = 物理屏幕 / 截图图像。
+ * LLM 坐标（图像空间）× scale = 物理屏幕坐标。
+ * 无截图记录时返回 1:1（hasReference=false，坐标按物理屏幕解释）。
+ */
+export function scaleFromImage(): { sx: number; sy: number; imgW: number; imgH: number; hasReference: boolean } {
+  const screen = robot.getScreenSize()
+  if (!lastImageSize.width || !lastImageSize.height) {
+    return { sx: 1, sy: 1, imgW: screen.width, imgH: screen.height, hasReference: false }
+  }
+  return {
+    sx: screen.width / lastImageSize.width,
+    sy: screen.height / lastImageSize.height,
+    imgW: lastImageSize.width,
+    imgH: lastImageSize.height,
+    hasReference: true
+  }
+}
+
+/** 图像空间坐标 → 物理屏幕坐标 */
+export function mapImageToScreen(x: number, y: number): { x: number; y: number } {
+  const s = scaleFromImage()
+  return { x: Math.round(x * s.sx), y: Math.round(y * s.sy) }
+}
+
+function isFiniteNum(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
+/** 截图元信息文本（与图像一起返回，告知 LLM 坐标空间） */
+function screenshotMeta(width: number, height: number): string {
+  const screen = robot.getScreenSize()
+  const same = screen.width === width && screen.height === height
+  return `Screenshot: image ${width}x${height}px, physical screen ${screen.width}x${screen.height}px.${
+    same
+      ? ''
+      : ' IMPORTANT: all action coordinates (click/drag/scroll) must be in THIS image\'s pixel space — the agent scales them to the physical screen automatically.'
+  }`
+}
+
+/** 截图 → 缩放 → base64，并更新坐标基准 */
+function captureAndResize(img: RawBgraImage): { base64: string; width: number; height: number } {
+  const r = resizeBgraToPngBase64(img)
+  lastImageSize = { width: r.width, height: r.height }
+  return r
+}
+
+/** 执行动作后附带新截图（after=true 时使用） */
+async function withAfterScreenshot(text: string): Promise<string> {
+  await sleep(50) // 给 UI 一点渲染时间
+  const { base64, width, height } = captureAndResize(robot.screen.capture())
+  return `${text}\n__IMAGE_BASE64__:${base64}\n${screenshotMeta(width, height)}`
+}
+
+// ============================================================
+// 工具定义
+// ============================================================
+
+export const desktopTool: ToolHandler = {
   definition: {
     type: 'function',
     function: {
-      name: 'desktop_key_tap',
-      description: 'Press and release a single key, optionally with modifier keys. Use for shortcuts (e.g. Ctrl+C, Alt+Tab) and special keys (enter, escape, f1, etc.).',
+      name: DESKTOP_TOOL_NAME,
+      description:
+        'Control the user\'s desktop (mouse, keyboard, screen). ' +
+        'COORDINATE RULE: the x,y of click/drag/scroll actions are PIXELS IN THE LAST SCREENSHOT IMAGE you received ' +
+        '(not physical screen pixels — scaling to the real screen is handled automatically). ' +
+        'If you have not seen a screenshot yet, call action="screenshot" first. ' +
+        'Every action is atomic: a click moves the cursor and clicks in one step. ' +
+        'Set after=true on an action to get a fresh screenshot confirming the result without an extra call ' +
+        '(the new image then becomes the reference for your next coordinates).',
       parameters: {
         type: 'object',
         properties: {
-          key: {
+          action: {
             type: 'string',
-            description: 'Key name (e.g. "enter", "escape", "tab", "backspace", "delete", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1"-"f24", "printscreen", "insert", or a single character like "a", "1")'
+            enum: ['screenshot', 'left_click', 'right_click', 'middle_click', 'double_click', 'drag', 'scroll', 'type', 'key'],
+            description:
+              'screenshot: capture the screen (returns an image). ' +
+              'left_click/right_click/middle_click/double_click: move to (x,y) in image pixels and click. ' +
+              'drag: press at (x,y), move to (end_x,end_y), release. ' +
+              'scroll: scroll by (scroll_x,scroll_y) at current cursor, or at (x,y) if provided. ' +
+              'type: type `text` at the current text cursor. ' +
+              'key: press a key or shortcut (key + modifiers).'
           },
-          modifier: {
-            description: 'Modifier key(s): "alt", "control", "shift", "command", or an array of these (e.g. ["control","shift"])',
-            oneOf: [
-              { type: 'string' },
-              { type: 'array', items: { type: 'string' } }
-            ]
+          x: { type: 'number', description: 'X in LAST SCREENSHOT image pixels (0 = left edge). Required for clicks/double_click/drag start; optional for scroll.' },
+          y: { type: 'number', description: 'Y in LAST SCREENSHOT image pixels (0 = top edge). Required for clicks/double_click/drag start; optional for scroll.' },
+          end_x: { type: 'number', description: 'drag only: end X in screenshot image pixels (required for drag).' },
+          end_y: { type: 'number', description: 'drag only: end Y in screenshot image pixels (required for drag).' },
+          button: { type: 'string', enum: ['left', 'right', 'middle'], description: 'drag only: button to hold (default left).' },
+          scroll_x: { type: 'number', description: 'scroll only: horizontal amount, positive = right (default 0).' },
+          scroll_y: { type: 'number', description: 'scroll only: vertical amount, positive = down (required for scroll).' },
+          text: { type: 'string', description: 'type only: text to type (ASCII and Unicode supported).' },
+          key: { type: 'string', description: 'key only: "enter", "tab", "escape", "backspace", "delete", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1"-"f24", "printscreen", "insert", or a single character like "a" or "1".' },
+          modifiers: {
+            type: 'array',
+            items: { type: 'string', enum: ['alt', 'control', 'shift', 'command'] },
+            description: 'key only: modifiers held with the key (e.g. copy = key "c" + modifiers ["control"]).'
+          },
+          after: {
+            type: 'boolean',
+            description:
+              'Any action: if true, a fresh screenshot is attached to the result so you can verify the outcome. ' +
+              'Default false. Use after clicks/typing when the result must be confirmed; skip it when the effect is predictable to save context.'
           }
         },
-        required: ['key']
-      }
-    }
-  },
-  permission: 'dangerous',
-  async execute(args) {
-    const key = args.key as string
-    const modifier = args.modifier as string | string[] | undefined
-    try {
-      // keyTap(key, modifier?) — modifier can be string or string[]
-      robot.keyTap(key, modifier as any)
-      const modStr = modifier ? ` + ${Array.isArray(modifier) ? modifier.join('+') : modifier}` : ''
-      return `Key pressed: ${key}${modStr}`
-    } catch (err) {
-      return `Error pressing key: ${(err as Error).message}`
-    }
-  }
-}
-
-// ---- desktop_type_text ----
-export const desktopTypeTextTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_type_text',
-      description: 'Type a string of text at the current cursor position. Supports ASCII and Unicode characters. Set cpm for natural typing speed.',
-      parameters: {
-        type: 'object',
-        properties: {
-          text: { type: 'string', description: 'Text to type' },
-          cpm: { type: 'number', description: 'Optional typing speed in characters per minute. If provided, types with natural random delays (e.g. 600=normal speed, 300=slow)' }
-        },
-        required: ['text']
-      }
-    }
-  },
-  permission: 'dangerous',
-  async execute(args) {
-    const text = args.text as string
-    const cpm = args.cpm as number | undefined
-    try {
-      if (cpm && cpm > 0) {
-        // typeStringDelayed(string, cpm) — natural typing with random delays
-        robot.typeStringDelayed(text, Math.round(cpm))
-        return `Typed "${text}" at ${cpm} CPM`
-      } else {
-        // typeString(string) — fast typing
-        robot.typeString(text)
-        return `Typed "${text}"`
-      }
-    } catch (err) {
-      return `Error typing text: ${(err as Error).message}`
-    }
-  }
-}
-
-// ============================================================
-// 屏幕工具
-// ============================================================
-
-// ---- desktop_screenshot ----
-export const desktopScreenshotTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_screenshot',
-      description: 'Capture a screenshot of the entire screen or a specific screen/window. Returns a base64 PNG image for visual analysis. Use this to see what is currently on screen.',
-      parameters: {
-        type: 'object',
-        properties: {
-          target: {
-            type: 'string',
-            enum: ['screen', 'window'],
-            description: 'Capture target: "screen" for entire screen (default), "window" for a specific window'
-          },
-          window_name: {
-            type: 'string',
-            description: 'When target=window, specify window title to capture. If omitted, captures the active window.'
-          },
-          max_width: {
-            type: 'number',
-            description: 'Maximum thumbnail width in pixels (default: screen width). Set smaller to reduce image size.'
-          }
-        }
+        required: ['action']
       }
     }
   },
   permission: 'normal',
   async execute(args) {
-    const target = (args.target as 'screen' | 'window') || 'screen'
-    const windowName = args.window_name as string | undefined
-    const maxWidth = args.max_width as number | undefined
-    try {
-      // Get screen dimensions for thumbnail size
-      const screenSize = electronScreen.getPrimaryDisplay().size
-      const thumbWidth = maxWidth && maxWidth > 0 ? maxWidth : screenSize.width
-      const thumbHeight = Math.round(thumbWidth * (screenSize.height / screenSize.width))
+    const action = args.action as string
+    const after = args.after === true
+    const wantAfter = (text: string): Promise<string> => (after ? withAfterScreenshot(text) : Promise.resolve(text))
 
-      // desktopCapturer.getSources(options) — returns DesktopCapturerSource[]
-      // Each source has: id, name, thumbnail (NativeImage), display_id
-      const sources = await desktopCapturer.getSources({
-        types: [target],
-        thumbnailSize: { width: thumbWidth, height: thumbHeight },
-        fetchWindowIcons: false
-      })
-
-      if (sources.length === 0) {
-        return `No ${target} sources found for screenshot.`
+    // ---- 坐标类动作公共校验：必须落在上次截图图像范围内 ----
+    const checkPoint = (msg: string): { x: number; y: number } | string => {
+      if (!isFiniteNum(args.x) || !isFiniteNum(args.y)) return msg
+      if (args.x < 0 || args.y < 0) return `Invalid coordinates (${args.x}, ${args.y}): must be >= 0.`
+      const s = scaleFromImage()
+      if (args.x > s.imgW + 0.5 || args.y > s.imgH + 0.5) {
+        return `Invalid coordinates (${args.x}, ${args.y}): outside the last screenshot image (${s.imgW}x${s.imgH}). Take a fresh screenshot and use coordinates within it.`
       }
+      return { x: args.x, y: args.y }
+    }
+    const noReferenceHint =
+      '\nNote: no screenshot has been taken yet in this session, so coordinates were interpreted as PHYSICAL screen pixels. For reliable targeting, take a screenshot first and use coordinates from that image.'
 
-      // Find the right source
-      let source = sources[0]
-      if (target === 'window' && windowName) {
-        const found = sources.find(s =>
-          s.name.toLowerCase().includes(windowName.toLowerCase())
+    if (action === 'screenshot') {
+      const { base64, width, height } = captureAndResize(robot.screen.capture())
+      return `__IMAGE_BASE64__:${base64}\n${screenshotMeta(width, height)}`
+    }
+
+    switch (action) {
+      case 'left_click':
+      case 'right_click':
+      case 'middle_click':
+      case 'double_click': {
+        const pt = checkPoint(`Missing or invalid x/y for ${action}. Provide coordinates in the last screenshot image's pixels.`)
+        if (typeof pt === 'string') return pt
+        const button = action === 'right_click' ? 'right' : action === 'middle_click' ? 'middle' : 'left'
+        const double = action === 'double_click'
+        const p = mapImageToScreen(pt.x, pt.y)
+        const s = scaleFromImage()
+        const screen = robot.getScreenSize()
+        robot.moveMouse(p.x, p.y)
+        robot.mouseClick(button, double)
+        return wantAfter(
+          `${double ? 'Double-' : ''}Clicked ${button} at image (${Math.round(pt.x)}, ${Math.round(pt.y)}) → screen (${p.x}, ${p.y}) [image ${s.imgW}x${s.imgH}, screen ${screen.width}x${screen.height}]${
+            s.hasReference ? '' : noReferenceHint
+          }`
         )
-        if (found) source = found
       }
 
-      // thumbnail.toDataURL() returns "data:image/png;base64,..."
-      const dataUrl = source.thumbnail.toDataURL()
-      const base64 = dataUrl.split(',')[1]
-
-      if (!base64 || base64.length < 100) {
-        return `Screenshot captured but image appears empty. Source: ${source.name}`
+      case 'drag': {
+        const start = checkPoint('Missing or invalid x/y (drag start). Provide coordinates in the last screenshot image\'s pixels.')
+        if (typeof start === 'string') return start
+        if (!isFiniteNum(args.end_x) || !isFiniteNum(args.end_y)) {
+          return 'Missing or invalid end_x/end_y for drag. Provide end coordinates in the last screenshot image\'s pixels.'
+        }
+        const s0 = scaleFromImage()
+        if (args.end_x > s0.imgW + 0.5 || args.end_y > s0.imgH + 0.5) {
+          return `Invalid drag end (${args.end_x}, ${args.end_y}): outside the last screenshot image (${s0.imgW}x${s0.imgH}).`
+        }
+        const button = (args.button as 'left' | 'right' | 'middle') || 'left'
+        const from = mapImageToScreen(start.x, start.y)
+        const to = mapImageToScreen(args.end_x, args.end_y)
+        robot.moveMouse(from.x, from.y)
+        robot.mouseToggle('down', button)
+        await sleep(50)
+        // 拖拽用平滑移动：保证中间路径被 UI 识别为 drag（瞬时传送可能丢失 drag 语义），
+        // 速度 4000px/s，跨屏最多 ~0.5s
+        robot.moveMouseSmooth(to.x, to.y, 4000)
+        await sleep(60)
+        robot.mouseToggle('up', button)
+        return wantAfter(
+          `Dragged ${button} from image (${Math.round(start.x)}, ${Math.round(start.y)}) to image (${Math.round(args.end_x)}, ${Math.round(args.end_y)}) → screen (${from.x}, ${from.y}) to (${to.x}, ${to.y})${
+            s0.hasReference ? '' : noReferenceHint
+          }`
+        )
       }
 
-      // 返回 __IMAGE_BASE64__ 前缀标记，runner 会将其转换为多模态 content part
-      return `__IMAGE_BASE64__:${base64}`
-    } catch (err) {
-      return `Error capturing screenshot: ${(err as Error).message}`
-    }
-  }
-}
-
-// ---- desktop_screen_size ----
-export const desktopScreenSizeTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_screen_size',
-      description: 'Get the primary screen resolution (width and height in pixels). Useful before moving mouse or capturing screenshots.',
-      parameters: {
-        type: 'object',
-        properties: {}
+      case 'scroll': {
+        if (!isFiniteNum(args.scroll_y)) return 'Missing scroll_y for scroll. Positive = down.'
+        const sx = Math.round(isFiniteNum(args.scroll_x) ? args.scroll_x : 0)
+        const sy = Math.round(args.scroll_y)
+        if (Math.abs(sx) > 500 || Math.abs(sy) > 500) return 'Scroll amounts too large (max ±500 per call).'
+        if (isFiniteNum(args.x) && isFiniteNum(args.y)) {
+          const s = scaleFromImage()
+          if (args.x > s.imgW + 0.5 || args.y > s.imgH + 0.5) {
+            return `Invalid coordinates (${args.x}, ${args.y}): outside the last screenshot image (${s.imgW}x${s.imgH}).`
+          }
+          const p = mapImageToScreen(args.x, args.y)
+          robot.moveMouse(p.x, p.y)
+        }
+        robot.scrollMouse(sx, sy)
+        return wantAfter(`Scrolled (${sx}, ${sy}) at cursor position.`)
       }
-    }
-  },
-  permission: 'safe',
-  async execute() {
-    try {
-      // getScreenSize() returns {width, height}
-      const size = robot.getScreenSize()
-      return `Screen size: ${size.width} x ${size.height} pixels`
-    } catch (err) {
-      return `Error getting screen size: ${(err as Error).message}`
-    }
-  }
-}
 
-// ---- desktop_get_mouse_pos ----
-export const desktopGetMousePosTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_get_mouse_pos',
-      description: 'Get the current mouse cursor position (x, y coordinates in pixels).',
-      parameters: {
-        type: 'object',
-        properties: {}
+      case 'type': {
+        const text = args.text
+        if (typeof text !== 'string' || text.length === 0) return 'Missing text for type.'
+        robot.typeString(text)
+        return wantAfter(`Typed ${text.length} characters: "${text.length > 80 ? text.slice(0, 80) + '…' : text}"`)
       }
-    }
-  },
-  permission: 'safe',
-  async execute() {
-    try {
-      // getMousePos() returns {x, y}
-      const pos = robot.getMousePos()
-      return `Mouse position: (${pos.x}, ${pos.y})`
-    } catch (err) {
-      return `Error getting mouse position: ${(err as Error).message}`
-    }
-  }
-}
 
-// ---- desktop_get_pixel_color ----
-export const desktopGetPixelColorTool: ToolHandler = {
-  definition: {
-    type: 'function',
-    function: {
-      name: 'desktop_get_pixel_color',
-      description: 'Get the color of a specific pixel on screen. Returns hex color string (e.g. "ff0000" for red).',
-      parameters: {
-        type: 'object',
-        properties: {
-          x: { type: 'number', description: 'X coordinate of the pixel' },
-          y: { type: 'number', description: 'Y coordinate of the pixel' }
-        },
-        required: ['x', 'y']
+      case 'key': {
+        const key = args.key as string
+        if (!key) return 'Missing key for key action.'
+        const mods = Array.isArray(args.modifiers) ? (args.modifiers as string[]) : []
+        const validMods = ['alt', 'control', 'shift', 'command']
+        for (const m of mods) {
+          if (!validMods.includes(m)) return `Invalid modifier "${m}". Valid: ${validMods.join(', ')}.`
+        }
+        robot.keyTap(key, mods.length > 1 ? mods : mods[0])
+        return wantAfter(`Pressed key: ${key}${mods.length > 0 ? ' + ' + mods.join('+') : ''}`)
       }
-    }
-  },
-  permission: 'safe',
-  async execute(args) {
-    const x = Math.round(args.x as number)
-    const y = Math.round(args.y as number)
-    try {
-      // getPixelColor(x, y) returns hex string (6 chars, lowercase, no #)
-      const color = robot.getPixelColor(x, y)
-      return `Pixel color at (${x}, ${y}): #${color}`
-    } catch (err) {
-      return `Error getting pixel color: ${(err as Error).message}`
+
+      default:
+        return `Unknown action "${action}". Valid: screenshot, left_click, right_click, middle_click, double_click, drag, scroll, type, key.`
     }
   }
 }
 
 // ============================================================
-// 导出所有桌面控制工具
+// 导出（ipc/index.ts 按 { name, handler } 数组注册）
 // ============================================================
 export const desktopTools: { name: string; handler: ToolHandler }[] = [
-  { name: 'desktop_mouse_move', handler: desktopMouseMoveTool },
-  { name: 'desktop_mouse_click', handler: desktopMouseClickTool },
-  { name: 'desktop_mouse_drag', handler: desktopMouseDragTool },
-  { name: 'desktop_mouse_scroll', handler: desktopMouseScrollTool },
-  { name: 'desktop_key_tap', handler: desktopKeyTapTool },
-  { name: 'desktop_type_text', handler: desktopTypeTextTool },
-  { name: 'desktop_screenshot', handler: desktopScreenshotTool },
-  { name: 'desktop_screen_size', handler: desktopScreenSizeTool },
-  { name: 'desktop_get_mouse_pos', handler: desktopGetMousePosTool },
-  { name: 'desktop_get_pixel_color', handler: desktopGetPixelColorTool }
+  { name: DESKTOP_TOOL_NAME, handler: desktopTool }
 ]

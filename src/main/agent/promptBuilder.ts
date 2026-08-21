@@ -60,10 +60,7 @@ const TOOL_CATEGORIES: { label: string; tools: string[] }[] = [
   },
   {
     label: 'Desktop Control',
-    tools: ['desktop_screen_size', 'desktop_get_mouse_pos', 'desktop_mouse_move',
-            'desktop_mouse_click', 'desktop_mouse_drag', 'desktop_mouse_scroll',
-            'desktop_key_tap', 'desktop_type_text', 'desktop_screenshot',
-            'desktop_get_pixel_color']
+    tools: ['desktop']
   },
   {
     label: 'Memory',
