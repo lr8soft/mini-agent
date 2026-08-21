@@ -154,11 +154,12 @@ export const desktopTool: ToolHandler = {
         properties: {
           action: {
             type: 'string',
-            enum: ['screenshot', 'left_click', 'right_click', 'middle_click', 'double_click', 'drag', 'scroll', 'type', 'key'],
+            enum: ['screenshot', 'move', 'left_click', 'right_click', 'middle_click', 'double_click', 'drag', 'scroll', 'type', 'key'],
             description:
               'screenshot: capture the primary screen (returns an image). ' +
+              'move: move the cursor to (x,y) WITHOUT clicking (use when you only need to reposition/hover the cursor — do NOT use drag just to move it). ' +
               'left_click/right_click/middle_click/double_click: move to (x,y) in image pixels and click. ' +
-              'drag: press at (x,y), move to (end_x,end_y), release. ' +
+              'drag: press at (x,y), move to (end_x,end_y), release (only when you actually need to drag an element). ' +
               'scroll: scroll by (scroll_x,scroll_y) at current cursor, or at (x,y) if provided. ' +
               'type: type `text` at the current text cursor. ' +
               'key: press a key or shortcut (key + modifiers).'
@@ -213,6 +214,19 @@ export const desktopTool: ToolHandler = {
     }
 
     switch (action) {
+      case 'move': {
+        const pt = checkPoint('Missing or invalid x/y for move. Provide coordinates in the last screenshot image\'s pixels.')
+        if (typeof pt === 'string') return pt
+        const s = scaleFromImage()
+        const p = mapImageToScreen(pt.x, pt.y)
+        robot.moveMouse(p.x, p.y)
+        return wantAfter(
+          `Cursor moved to image (${Math.round(pt.x)}, ${Math.round(pt.y)}) → screen (${p.x}, ${p.y}) [no click]${
+            s.hasReference ? '' : noReferenceHint
+          }`
+        )
+      }
+
       case 'left_click':
       case 'right_click':
       case 'middle_click':
@@ -298,7 +312,7 @@ export const desktopTool: ToolHandler = {
       }
 
       default:
-        return `Unknown action "${action}". Valid: screenshot, left_click, right_click, middle_click, double_click, drag, scroll, type, key.`
+        return `Unknown action "${action}". Valid: screenshot, move, left_click, right_click, middle_click, double_click, drag, scroll, type, key.`
     }
   }
 }
