@@ -411,7 +411,8 @@ select.input-field { cursor: pointer; }
 .settings-section-title p { margin-top: 2px; color: var(--app-color-text-mute); font-size: 0.733rem; }
 .settings-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; color: var(--app-color-text-soft); font-size: 0.733rem; line-height: 1.5; }
 .settings-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--app-color-primary-strong); }
-.settings-footer { display: flex; justify-content: flex-end; margin-top: 18px; }
+.settings-footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
+.settings-dirty-hint { margin-right: auto; color: var(--app-color-text-mute); font-size: 0.767rem; }
 
 /* 主题选择 */
 .theme-choice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }

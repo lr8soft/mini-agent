@@ -79,6 +79,9 @@ export default {
       general: 'General'
     },
     save: 'Save Settings',
+    cancel: 'Cancel',
+    unsaved: 'Unsaved changes',
+    confirmLeave: 'You have unsaved changes. Leave anyway? Unsaved changes will be discarded.',
     providers: {
       hint: 'Configure LLM providers. Any OpenAI-compatible endpoint works (Ollama, vLLM, OpenAI, Anthropic, etc.).',
       zhuminetBanner: 'All-in-one AI model API service. Sign up to get free credits.',

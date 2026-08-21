@@ -79,6 +79,9 @@ export default {
       general: 'Allgemein'
     },
     save: 'Einstellungen speichern',
+    cancel: 'Abbrechen',
+    unsaved: 'Ungespeicherte Änderungen',
+    confirmLeave: 'Du hast ungespeicherte Änderungen. Jetzt gehen? Ungespeicherte Änderungen gehen verloren.',
     providers: {
       hint: 'Konfigurieren Sie LLM-Anbieter. Jeder OpenAI-kompatible Endpunkt funktioniert (Ollama, vLLM, OpenAI, Anthropic, etc.).',
       zhuminetBanner: 'KI-Modell-API-Dienst, Registrierung mit kostenlosem Guthaben',

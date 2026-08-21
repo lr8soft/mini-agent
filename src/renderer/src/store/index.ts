@@ -10,6 +10,7 @@
 // ============================================================
 import { create } from 'zustand'
 import type { Session, UIMessage, AppSettings, AutoApproveMode } from '@shared/types'
+import i18n, { getEffectiveLanguage, storeLanguage, type AppLanguage } from '../i18n'
 
 const api = window.api
 
@@ -122,10 +123,21 @@ interface AppState {
   /** 手动压缩进行中（显式用户操作，全局一次一个即可） */
   isCompacting: boolean
 
-  // 设置
-  settings: AppSettings
+  // 设置 — 草稿模式（改动不点"保存"不生效；"取消"丢弃改动恢复原值）
+  settings: AppSettings                       // 权威设置（来自 DB），设置页之外的 UI 用这个
+  settingsDraft: AppSettings                  // 设置页草稿（各设置子组件读写这个，未保存）
+  isSettingsDirty: boolean                    // 草稿是否有未保存的改动
+  /** 进入设置页时的外观快照（主题/字号即时预览会改 store 当前值，取消时据此恢复） */
+  settingsSnapshot: { theme: Theme; fontSize: number } | null
   loadSettings: () => Promise<void>
-  saveSettings: (s: AppSettings, returnToChat?: boolean) => Promise<void>
+  /** 进入设置页：初始化草稿 = 权威设置，记录外观快照 */
+  openSettings: () => void
+  /** 修改草稿（不写库） */
+  updateSettingsDraft: (patch: Partial<AppSettings>) => void
+  /** 保存：把草稿写入 DB 并提升为权威设置 */
+  saveSettings: () => Promise<void>
+  /** 取消：丢弃草稿，恢复外观快照 */
+  cancelSettings: () => void
 
   // Agent 操作
   sendMessage: (text: string, images?: string[]) => Promise<void>
@@ -398,7 +410,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // ---- 设置 ----
+  // ---- 设置（草稿模式）----
   settings: {
     providers: [],
     mcpServers: [],
@@ -406,18 +418,65 @@ export const useAppStore = create<AppState>((set, get) => ({
     activeProviderId: null,
     workspacePath: ''
   },
+  settingsDraft: {
+    providers: [],
+    mcpServers: [],
+    skills: [],
+    activeProviderId: null,
+    workspacePath: ''
+  },
+  isSettingsDirty: false,
+  settingsSnapshot: null,
   loadSettings: async () => {
     const settings = await api.settings.get()
     set({ settings })
   },
-  saveSettings: async (s, returnToChat = false) => {
+  openSettings: () => {
+    const { settings, theme, fontSize } = get()
+    set({
+      // 草稿从权威设置初始化（浅拷贝足够：子组件每次提交整个数组）
+      settingsDraft: { ...settings },
+      isSettingsDirty: false,
+      settingsSnapshot: { theme, fontSize }
+    })
+  },
+  updateSettingsDraft: (patch) => {
+    set((s) => ({
+      settingsDraft: { ...s.settingsDraft, ...patch },
+      isSettingsDirty: true
+    }))
+  },
+  saveSettings: async () => {
+    const draft = get().settingsDraft
     try {
-      await api.settings.save(s)
-      set({ settings: s })
-      // 仅在用户显式点击"保存"按钮时回到聊天页；实时输入更新不应触发跳转
-      if (returnToChat) set({ view: 'chat' })
+      await api.settings.save(draft)
+      // 草稿提升为权威设置；草稿保留（设置页仍可继续编辑）
+      set({
+        settings: draft,
+        settingsDraft: { ...draft },
+        isSettingsDirty: false
+      })
     } catch (err) {
       console.error('Failed to save settings:', err)
     }
+  },
+  cancelSettings: () => {
+    const { settings, settingsSnapshot } = get()
+    // 草稿回退到权威设置
+    set({
+      settingsDraft: { ...settings },
+      isSettingsDirty: false
+    })
+    // 恢复进入设置页时的外观（主题/字号在编辑时是即时预览的）
+    if (settingsSnapshot) {
+      const { theme, fontSize } = settingsSnapshot
+      set({ theme, fontSize })
+      try { localStorage.setItem(THEME_STORAGE_KEY, theme) } catch { /* ignore */ }
+      try { localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize)) } catch { /* ignore */ }
+    }
+    // 恢复界面语言（编辑时是即时切换的预览）
+    const effective = getEffectiveLanguage((settings.language as AppLanguage) || 'auto')
+    storeLanguage((settings.language as AppLanguage) || 'auto')
+    i18n.changeLanguage(effective)
   }
 }))

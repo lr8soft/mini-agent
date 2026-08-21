@@ -11,17 +11,20 @@ const THEME_OPTIONS: { value: Theme; icon: typeof Sun; labelKey: string }[] = [
 
 export function GeneralSettings() {
   const { t, i18n } = useTranslation()
-  const { settings, saveSettings, theme, setTheme, fontSize, setFontSize } = useAppStore()
-  const isUnlimited = (settings.maxRetries ?? 5) === -1
-  const isRoundsUnlimited = (settings.maxRounds ?? 20) === 0
+  // 草稿模式：数值/路径类设置改草稿（Save 才入库）；
+  // 主题/字号/语言是即时预览（Cancel 时由 store 快照 / 父组件恢复）
+  const { settingsDraft, updateSettingsDraft, theme, setTheme, fontSize, setFontSize } = useAppStore()
+  const isUnlimited = (settingsDraft.maxRetries ?? 5) === -1
+  const isRoundsUnlimited = (settingsDraft.maxRounds ?? 20) === 0
 
   const pickDir = async () => {
     const dir = await window.api.settings.pickDirectory()
-    if (dir) saveSettings({ ...settings, workspacePath: dir })
+    if (dir) updateSettingsDraft({ workspacePath: dir })
   }
 
   const handleLanguageChange = (lang: AppLanguage) => {
-    saveSettings({ ...settings, language: lang })
+    updateSettingsDraft({ language: lang })
+    // 即时预览：立即切换界面语言（取消时恢复）
     const effective = getEffectiveLanguage(lang)
     storeLanguage(lang)
     i18n.changeLanguage(effective)
@@ -91,7 +94,7 @@ export function GeneralSettings() {
         </div>
         <select
           className="input-field"
-          value={settings.language || 'auto'}
+          value={settingsDraft.language || 'auto'}
           onChange={(e) => handleLanguageChange(e.target.value as AppLanguage)}
         >
           {SUPPORTED_LANGUAGES.map(lang => (
@@ -127,18 +130,18 @@ export function GeneralSettings() {
               min={0}
               max={99}
               style={{ width: 90 }}
-              value={isUnlimited ? '' : (settings.maxRetries ?? 5)}
+              value={isUnlimited ? '' : (settingsDraft.maxRetries ?? 5)}
               disabled={isUnlimited}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10)
-                saveSettings({ ...settings, maxRetries: Number.isFinite(v) ? Math.max(0, Math.min(99, v)) : 5 })
+                updateSettingsDraft({ maxRetries: Number.isFinite(v) ? Math.max(0, Math.min(99, v)) : 5 })
               }}
             />
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--app-color-text-soft)', fontSize: '0.8rem' }}>
               <input
                 type="checkbox"
                 checked={isUnlimited}
-                onChange={(e) => saveSettings({ ...settings, maxRetries: e.target.checked ? -1 : 5 })}
+                onChange={(e) => updateSettingsDraft({ maxRetries: e.target.checked ? -1 : 5 })}
               />
               {t('settings.general.retriesUnlimited')}
             </label>
@@ -172,18 +175,18 @@ export function GeneralSettings() {
               min={1}
               max={999}
               style={{ width: 90 }}
-              value={isRoundsUnlimited ? '' : (settings.maxRounds ?? 20)}
+              value={isRoundsUnlimited ? '' : (settingsDraft.maxRounds ?? 20)}
               disabled={isRoundsUnlimited}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10)
-                saveSettings({ ...settings, maxRounds: Number.isFinite(v) ? Math.max(1, Math.min(999, v)) : 20 })
+                updateSettingsDraft({ maxRounds: Number.isFinite(v) ? Math.max(1, Math.min(999, v)) : 20 })
               }}
             />
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--app-color-text-soft)', fontSize: '0.8rem' }}>
               <input
                 type="checkbox"
                 checked={isRoundsUnlimited}
-                onChange={(e) => saveSettings({ ...settings, maxRounds: e.target.checked ? 0 : 20 })}
+                onChange={(e) => updateSettingsDraft({ maxRounds: e.target.checked ? 0 : 20 })}
               />
               {t('settings.general.roundsUnlimited')}
             </label>
@@ -205,8 +208,8 @@ export function GeneralSettings() {
           <input
             className="input-field mono"
             style={{ flex: 1 }}
-            value={settings.workspacePath}
-            onChange={(e) => saveSettings({ ...settings, workspacePath: e.target.value })}
+            value={settingsDraft.workspacePath}
+            onChange={(e) => updateSettingsDraft({ workspacePath: e.target.value })}
           />
           <button onClick={pickDir} className="btn-ghost">{t('settings.general.browse')}</button>
         </div>

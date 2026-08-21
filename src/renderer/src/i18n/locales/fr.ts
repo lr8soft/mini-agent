@@ -79,6 +79,9 @@ export default {
       general: 'Général'
     },
     save: 'Enregistrer',
+    cancel: 'Annuler',
+    unsaved: 'Modifications non enregistrées',
+    confirmLeave: 'Vous avez des modifications non enregistrées. Quitter quand même ? Les modifications non enregistrées seront perdues.',
     providers: {
       hint: 'Configurez les fournisseurs LLM. Tout endpoint compatible OpenAI fonctionne (Ollama, vLLM, OpenAI, Anthropic, etc.).',
       zhuminetBanner: 'Service API de modèles IA, inscription avec crédit gratuit',

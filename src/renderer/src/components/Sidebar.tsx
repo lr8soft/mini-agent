@@ -56,10 +56,18 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* 底部设置入口 */}
+      {/* 底部设置入口（有未保存改动时离开需确认） */}
       <button
         className={view === 'settings' ? 'sidebar-settings active' : 'sidebar-settings'}
-        onClick={() => setView(view === 'settings' ? 'chat' : 'settings')}
+        onClick={() => {
+          if (view === 'settings') {
+            const st = useAppStore.getState()
+            if (st.isSettingsDirty && !confirm(t('settings.confirmLeave'))) return
+            // 离开设置页 → 丢弃草稿并恢复即时预览的外观/语言（与"取消"按钮同语义）
+            st.cancelSettings()
+          }
+          setView(view === 'settings' ? 'chat' : 'settings')
+        }}
       >
         <Settings2 size={15} />
         {t('sidebar.settings')}

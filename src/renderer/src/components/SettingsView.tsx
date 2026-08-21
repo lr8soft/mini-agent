@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Brain, Cable, Server, Settings2, Sparkles } from 'lucide-react'
 import { useAppStore } from '../store'
@@ -23,9 +23,26 @@ const TAB_ICONS: Record<Tab, typeof Server> = {
 export default function SettingsView() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('providers')
-  const { settings, saveSettings } = useAppStore()
+  // 设置页只操作草稿；Save 写库、Cancel 丢弃（草稿模式，避免"改一个字就入库"）
+  const { settingsDraft, isSettingsDirty, openSettings, saveSettings, cancelSettings, setView } = useAppStore()
+
+  // 进入设置页时初始化草稿（每次 mount 都刷新一次，防止上次未保存的草稿残留）
+  useEffect(() => {
+    openSettings()
+  }, [openSettings])
 
   const tabs: Tab[] = ['providers', 'mcp', 'skills', 'memory', 'usage', 'general']
+
+  const handleSave = async () => {
+    await saveSettings()
+    // 保存成功后回到聊天页（与旧行为一致）
+    setView('chat')
+  }
+
+  const handleCancel = () => {
+    cancelSettings()
+    setView('chat')
+  }
 
   return (
     <div className="settings-view">
@@ -51,27 +68,35 @@ export default function SettingsView() {
           })}
         </div>
 
-        {/* 内容 */}
+        {/* 内容（全部绑定草稿） */}
         {tab === 'providers' && <ProviderSettings
-          providers={settings.providers}
-          activeId={settings.activeProviderId}
-          onChange={(providers, activeId) => saveSettings({ ...settings, providers, activeProviderId: activeId })}
+          providers={settingsDraft.providers}
+          activeId={settingsDraft.activeProviderId}
+          onChange={(providers, activeId) => useAppStore.getState().updateSettingsDraft({ providers, activeProviderId: activeId })}
         />}
         {tab === 'mcp' && <McpSettings
-          servers={settings.mcpServers}
-          onChange={(mcpServers) => saveSettings({ ...settings, mcpServers })}
+          servers={settingsDraft.mcpServers}
+          onChange={(mcpServers) => useAppStore.getState().updateSettingsDraft({ mcpServers })}
         />}
         {tab === 'skills' && <SkillSettings
-          skills={settings.skills}
-          onChange={(skills) => saveSettings({ ...settings, skills })}
+          skills={settingsDraft.skills}
+          onChange={(skills) => useAppStore.getState().updateSettingsDraft({ skills })}
         />}
         {tab === 'memory' && <MemorySettings />}
         {tab === 'usage' && <UsageSettings />}
         {tab === 'general' && <GeneralSettings />}
 
-        {/* 保存按钮 */}
+        {/* 保存 / 取消 */}
         <div className="settings-footer">
-          <button className="btn-primary" onClick={() => saveSettings(settings, true)}>
+          {isSettingsDirty && <span className="settings-dirty-hint">{t('settings.unsaved')}</span>}
+          <button className="btn-ghost" onClick={handleCancel}>
+            {t('settings.cancel')}
+          </button>
+          <button
+            className="btn-primary"
+            onClick={handleSave}
+            disabled={!isSettingsDirty}
+          >
             {t('settings.save')}
           </button>
         </div>

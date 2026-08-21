@@ -79,6 +79,9 @@ export default {
       general: 'General'
     },
     save: 'Guardar Configuración',
+    cancel: 'Cancelar',
+    unsaved: 'Cambios sin guardar',
+    confirmLeave: 'Tienes cambios sin guardar. ¿Salir de todos modos? Los cambios sin guardar se perderán.',
     providers: {
       hint: 'Configura proveedores LLM. Cualquier endpoint compatible con OpenAI funciona (Ollama, vLLM, OpenAI, Anthropic, etc.).',
       zhuminetBanner: 'Servicio de API de modelos de IA, registro con crédito gratis',

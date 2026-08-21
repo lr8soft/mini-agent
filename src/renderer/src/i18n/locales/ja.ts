@@ -79,6 +79,9 @@ export default {
       general: '一般'
     },
     save: '設定を保存',
+    cancel: 'キャンセル',
+    unsaved: '未保存の変更があります',
+    confirmLeave: '未保存の変更があります。離れますか？未保存の変更は破棄されます。',
     providers: {
       hint: 'LLM プロバイダーを設定。OpenAI 互換のエンドポイントなら何でも動作します (Ollama, vLLM, OpenAI, Anthropic など)。',
       zhuminetBanner: 'AI モデル API サービス、登録で無料枠付き',

@@ -79,6 +79,9 @@ export default {
       general: '通用'
     },
     save: '保存设置',
+    cancel: '取消',
+    unsaved: '有未保存的更改',
+    confirmLeave: '有未保存的更改，确定要离开吗？未保存的更改将丢失。',
     providers: {
       hint: '配置 LLM 提供商。任意 OpenAI 兼容端点均可（Ollama、vLLM、OpenAI、Anthropic 等）。',
       zhuminetBanner: '一站式 AI 模型 API 服务，注册即送免费额度',
