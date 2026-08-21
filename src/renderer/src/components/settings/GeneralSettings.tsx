@@ -11,8 +11,8 @@ const THEME_OPTIONS: { value: Theme; icon: typeof Sun; labelKey: string }[] = [
 
 export function GeneralSettings() {
   const { t, i18n } = useTranslation()
-  // 草稿模式：数值/路径类设置改草稿（Save 才入库）；
-  // 主题/字号/语言是即时预览（Cancel 时由 store 快照 / 父组件恢复）
+  // 草稿模式：所有设置改动都写入草稿（Save 才入库）；
+  // 主题/字号/语言同时即时预览（Cancel 时由 store 恢复基线快照）
   const { settingsDraft, updateSettingsDraft, theme, setTheme, fontSize, setFontSize } = useAppStore()
   const isUnlimited = (settingsDraft.maxRetries ?? 5) === -1
   const isRoundsUnlimited = (settingsDraft.maxRounds ?? 20) === 0
@@ -20,6 +20,18 @@ export function GeneralSettings() {
   const pickDir = async () => {
     const dir = await window.api.settings.pickDirectory()
     if (dir) updateSettingsDraft({ workspacePath: dir })
+  }
+
+  /** 主题：即时预览 + 写草稿（纳入 dirty/保存/取消语义） */
+  const changeTheme = (value: Theme) => {
+    setTheme(value)
+    updateSettingsDraft({ theme: value })
+  }
+
+  /** 字号：即时预览 + 写草稿 */
+  const changeFontSize = (px: number) => {
+    setFontSize(px)
+    updateSettingsDraft({ fontSize: px })
   }
 
   const handleLanguageChange = (lang: AppLanguage) => {
@@ -52,7 +64,7 @@ export function GeneralSettings() {
                 role="radio"
                 aria-checked={theme === value}
                 className={theme === value ? 'active' : ''}
-                onClick={() => setTheme(value)}
+                onClick={() => changeTheme(value)}
               >
                 <Icon size={15} />
                 {t(labelKey)}
@@ -73,7 +85,7 @@ export function GeneralSettings() {
             id="font-size-select"
             className="input-field"
             value={fontSize}
-            onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+            onChange={(e) => changeFontSize(parseInt(e.target.value, 10))}
           >
             {FONT_SIZE_OPTIONS.map(px => (
               <option key={px} value={px}>{t('settings.general.fontSizeOption', { px })}</option>

@@ -50,6 +50,13 @@ function getStoredApproveMode(): AutoApproveMode {
   }
 }
 
+/** 设置页草稿 = AppSettings + 外观（theme/fontSize 是 localStorage 项，也纳入草稿
+ *  参与 dirty/保存/取消语义，避免"只切主题时 Save 被禁用、取消被忽略"的问题） */
+export interface SettingsDraft extends AppSettings {
+  theme: Theme
+  fontSize: number
+}
+
 export interface PermissionRequest {
   permId: string
   sessionId: string
@@ -125,15 +132,15 @@ interface AppState {
 
   // 设置 — 草稿模式（改动不点"保存"不生效；"取消"丢弃改动恢复原值）
   settings: AppSettings                       // 权威设置（来自 DB），设置页之外的 UI 用这个
-  settingsDraft: AppSettings                  // 设置页草稿（各设置子组件读写这个，未保存）
-  isSettingsDirty: boolean                    // 草稿是否有未保存的改动
-  /** 进入设置页时的外观快照（主题/字号即时预览会改 store 当前值，取消时据此恢复） */
+  settingsDraft: SettingsDraft                // 设置页草稿（各设置子组件读写这个，未保存）
+  isSettingsDirty: boolean                    // 草稿是否有未保存的改动（含主题/字号）
+  /** 外观基线快照（取消时恢复到这里；保存成功后前移到已保存值） */
   settingsSnapshot: { theme: Theme; fontSize: number } | null
   loadSettings: () => Promise<void>
-  /** 进入设置页：初始化草稿 = 权威设置，记录外观快照 */
+  /** 进入设置页：初始化草稿 = 权威设置 + 当前外观，记录快照 */
   openSettings: () => void
   /** 修改草稿（不写库） */
-  updateSettingsDraft: (patch: Partial<AppSettings>) => void
+  updateSettingsDraft: (patch: Partial<SettingsDraft>) => void
   /** 保存：把草稿写入 DB 并提升为权威设置 */
   saveSettings: () => Promise<void>
   /** 取消：丢弃草稿，恢复外观快照 */
@@ -423,7 +430,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     mcpServers: [],
     skills: [],
     activeProviderId: null,
-    workspacePath: ''
+    workspacePath: '',
+    theme: 'system',
+    fontSize: DEFAULT_FONT_SIZE
   },
   isSettingsDirty: false,
   settingsSnapshot: null,
@@ -434,8 +443,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   openSettings: () => {
     const { settings, theme, fontSize } = get()
     set({
-      // 草稿从权威设置初始化（浅拷贝足够：子组件每次提交整个数组）
-      settingsDraft: { ...settings },
+      // 草稿从权威设置 + 当前外观初始化（浅拷贝足够：子组件每次提交整个数组）
+      settingsDraft: { ...settings, theme, fontSize },
       isSettingsDirty: false,
       settingsSnapshot: { theme, fontSize }
     })
@@ -447,33 +456,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     }))
   },
   saveSettings: async () => {
-    const draft = get().settingsDraft
+    const { settingsDraft: draft } = get()
     try {
-      await api.settings.save(draft)
-      // 草稿提升为权威设置；草稿保留（设置页仍可继续编辑）
+      // 落库的是 AppSettings（theme/fontSize 不在 DB schema 里，
+      // 它们是 localStorage 项，setTheme/setFontSize 时已实时持久化）
+      const { theme: _theme, fontSize: _fontSize, ...dbSettings } = draft
+      await api.settings.save(dbSettings)
+      // 草稿提升为权威设置；快照前移到已保存值
+      // （之后取消只回滚"本次保存之后"的改动，不会把刚保存的主题/字号退回旧值）
       set({
-        settings: draft,
+        settings: dbSettings,
         settingsDraft: { ...draft },
-        isSettingsDirty: false
+        isSettingsDirty: false,
+        settingsSnapshot: { theme: draft.theme, fontSize: draft.fontSize }
       })
     } catch (err) {
       console.error('Failed to save settings:', err)
     }
   },
   cancelSettings: () => {
-    const { settings, settingsSnapshot } = get()
-    // 草稿回退到权威设置
+    const { settings, settingsSnapshot, theme, fontSize } = get()
+    // 外观回退到基线快照（编辑时是即时预览的）
+    const base = settingsSnapshot || { theme, fontSize }
     set({
-      settingsDraft: { ...settings },
-      isSettingsDirty: false
+      settingsDraft: { ...settings, theme: base.theme, fontSize: base.fontSize },
+      isSettingsDirty: false,
+      theme: base.theme,
+      fontSize: base.fontSize
     })
-    // 恢复进入设置页时的外观（主题/字号在编辑时是即时预览的）
-    if (settingsSnapshot) {
-      const { theme, fontSize } = settingsSnapshot
-      set({ theme, fontSize })
-      try { localStorage.setItem(THEME_STORAGE_KEY, theme) } catch { /* ignore */ }
-      try { localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize)) } catch { /* ignore */ }
-    }
+    try { localStorage.setItem(THEME_STORAGE_KEY, base.theme) } catch { /* ignore */ }
+    try { localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(base.fontSize)) } catch { /* ignore */ }
     // 恢复界面语言（编辑时是即时切换的预览）
     const effective = getEffectiveLanguage((settings.language as AppLanguage) || 'auto')
     storeLanguage((settings.language as AppLanguage) || 'auto')
