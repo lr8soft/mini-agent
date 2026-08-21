@@ -13,6 +13,8 @@ export default {
     newSession: 'New session',
     noSessions: 'No sessions yet',
     deleteSession: 'Delete session',
+    deleteSessionTitle: 'Delete this session?',
+    deleteSessionConfirm: 'This will permanently delete the session and all of its messages.',
     running: 'Running',
     settings: 'Settings'
   },
@@ -176,7 +178,9 @@ export default {
       maxRoundsHint: 'Max tool-call rounds per conversation (default 20). When reached, the agent stops and writes a text-only summary. 0 = unlimited (loop detection still applies).',
       roundsUnlimited: 'Unlimited',
       agent: 'Agent Behavior',
-      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.'
+      agentHint: 'Safety net for the tool-call loop: repeated identical calls trigger warnings / hard stop; the round cap ends the run with an automatic summary.',
+      memory: 'Long-term Memory',
+      memoryHint: 'Automatically capture preferences and facts from conversations so the agent can personalize future replies.'
     },
     usage: {
       hint: 'Token usage statistics. Input/output tokens are recorded for each LLM call automatically.',

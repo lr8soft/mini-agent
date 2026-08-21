@@ -13,6 +13,8 @@ export default {
     newSession: '新建会话',
     noSessions: '暂无会话',
     deleteSession: '删除会话',
+    deleteSessionTitle: '删除此会话？',
+    deleteSessionConfirm: '会话及其全部消息将被永久删除，无法恢复。',
     running: '运行中',
     settings: '设置'
   },
@@ -177,6 +179,8 @@ export default {
       roundsUnlimited: '不限制',
       agent: 'Agent 行为',
       agentHint: '工具调用循环的安全网：重复相同调用会被警告/硬停，轮数达到上限后自动收尾。',
+      memory: '长期记忆',
+      memoryHint: '从对话中自动沉淀偏好与事实，让 agent 在后续对话中个性化回应。',
     },
     usage: {
       hint: 'Token 用量统计。每次 LLM 调用的 input/output tokens 自动记录。',

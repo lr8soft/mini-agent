@@ -501,6 +501,11 @@ select.input-field { cursor: pointer; }
 .dialog-args { margin: 0; padding: 10px 12px; max-height: 200px; overflow: auto; border: 1px solid var(--app-color-border); border-radius: 6px; background: var(--app-muted-bg); color: var(--app-color-text-soft); font-family: Consolas, Monaco, monospace; font-size: 0.733rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 .dialog-footer { display: flex; gap: 10px; padding: 13px 16px; border-top: 1px solid var(--app-color-border); background: var(--app-chrome-bg); }
 .dialog-footer .btn-primary, .dialog-footer .btn-danger { flex: 1; }
+/* 小型确认弹窗（如删除会话）：标题内的会话名 + 正文 + 居中按钮 */
+.dialog-session-title { margin-top: 2px; color: var(--app-color-text); font-size: 0.8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialog-confirm-text { margin: 0; color: var(--app-color-text-soft); font-size: 0.8rem; line-height: 1.55; }
+.dialog-footer-center { justify-content: center; }
+.dialog-footer-center > button { flex: 0 0 auto; min-width: 92px; }
 
 /* ---------- Markdown ---------- */
 .markdown-body { color: var(--app-color-text); font-size: 0.933rem; line-height: 1.65; word-break: break-word; }

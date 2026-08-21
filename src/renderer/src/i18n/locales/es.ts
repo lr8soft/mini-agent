@@ -13,6 +13,8 @@ export default {
     newSession: 'Nueva sesión',
     noSessions: 'Sin sesiones',
     deleteSession: 'Eliminar sesión',
+    deleteSessionTitle: '¿Eliminar esta sesión?',
+    deleteSessionConfirm: 'La sesión y todos sus mensajes se eliminarán permanentemente.',
     running: 'En ejecución',
     settings: 'Configuración'
   },
@@ -176,7 +178,9 @@ export default {
       maxRoundsHint: 'Máx. rondas de tool-call por conversación (default 20). Al alcanzarlo, el agente se detiene y escribe un resumen de texto. 0 = ilimitado (detección de bucles sigue activa).',
       roundsUnlimited: 'Ilimitado',
       agent: 'Comportamiento del Agente',
-      agentHint: 'Red de seguridad para el bucle de tool-call: llamadas idénticas repetidas disparan advertencias / parada forzada; el límite de rondas termina con un resumen automático.'
+      agentHint: 'Red de seguridad para el bucle de tool-call: llamadas idénticas repetidas disparan advertencias / parada forzada; el límite de rondas termina con un resumen automático.',
+      memory: 'Memoria a largo plazo',
+      memoryHint: 'Captura automáticamente preferencias y hechos de las conversaciones para personalizar las respuestas futuras.'
     },
     usage: {
       hint: 'Estadísticas de uso de tokens. Los tokens de entrada/salida se registran automáticamente para cada llamada LLM.',

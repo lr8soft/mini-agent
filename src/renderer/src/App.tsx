@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import SettingsView from './components/SettingsView'
 import PermissionDialog from './components/PermissionDialog'
+import ConfirmDeleteDialog from './components/ConfirmDeleteDialog'
 
 /** 向某会话的消息缓存追加/更新消息（该会话缓存不存在时自动初始化） */
 function pushMessage(sessionId: string, fn: (msgs: import('@shared/types').UIMessage[]) => import('@shared/types').UIMessage[]) {
@@ -311,6 +312,9 @@ export default function App() {
 
       {/* 权限确认弹窗（多会话并行时按 FIFO 逐个确认） */}
       <PermissionDialog />
+
+      {/* 会话删除确认弹窗（防误操作；z-index 高于权限弹窗，用户主动删除时置于最前） */}
+      <ConfirmDeleteDialog />
     </div>
   )
 }

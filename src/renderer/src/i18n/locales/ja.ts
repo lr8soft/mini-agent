@@ -13,6 +13,8 @@ export default {
     newSession: '新しいセッション',
     noSessions: 'セッションがありません',
     deleteSession: 'セッションを削除',
+    deleteSessionTitle: 'このセッションを削除しますか？',
+    deleteSessionConfirm: 'セッションとその全メッセージが完全に削除され、復元できません。',
     running: '実行中',
     settings: '設定'
   },
@@ -176,7 +178,9 @@ export default {
       maxRoundsHint: '1回の会話の最大ツール呼び出しラウンド数（デフォルト 20）。到達後にエージェントが停止し、テキストサマリーを出力します。0 = 無制限（ループ検出は有効）。',
       roundsUnlimited: '無制限',
       agent: 'エージェント動作',
-      agentHint: 'ツール呼び出しループのセーフティネット：同一呼び出しの繰り返しは警告/ハードストップ、ラウンド上限到達で自動サマリー。'
+      agentHint: 'ツール呼び出しループのセーフティネット：同一呼び出しの繰り返しは警告/ハードストップ、ラウンド上限到達で自動サマリー。',
+      memory: '長期記憶',
+      memoryHint: '会話から設定や事実を自動で記録し、エージェントが以降の応答を個人化します。'
     },
     usage: {
       hint: 'トークン使用量統計。各LLM呼び出しのinput/outputトークンが自動記録されます。',

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Check, FolderOpen, Globe, Monitor, Moon, RefreshCw, Repeat, Sun, Type, Wifi, Workflow } from 'lucide-react'
+import { Brain, Check, FolderOpen, Globe, Monitor, Moon, RefreshCw, Repeat, Sun, Type, Wifi, Workflow } from 'lucide-react'
 import { SUPPORTED_LANGUAGES, type AppLanguage, getEffectiveLanguage, storeLanguage } from '../../i18n'
 import { useAppStore, FONT_SIZE_OPTIONS, type Theme } from '../../store'
 
@@ -204,6 +204,25 @@ export function GeneralSettings() {
             </label>
           </div>
           <p className="form-hint">{t('settings.general.maxRoundsHint')}</p>
+        </div>
+      </section>
+
+      {/* 长期记忆 */}
+      <section className="settings-section">
+        <div className="switch-row">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <Brain size={16} style={{ color: 'var(--app-color-primary-strong)', flex: '0 0 auto' }} />
+            <div>
+              <strong>{t('settings.general.memory')}</strong>
+              <small>{t('settings.general.memoryHint')}</small>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            className="switch"
+            checked={settingsDraft.memoryEnabled !== false}
+            onChange={(e) => updateSettingsDraft({ memoryEnabled: e.target.checked })}
+          />
         </div>
       </section>
 

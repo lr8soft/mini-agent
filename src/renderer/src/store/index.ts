@@ -101,6 +101,14 @@ interface AppState {
   loadSessions: () => Promise<void>
   createSession: () => Promise<void>
   deleteSession: (id: string) => Promise<void>
+  /** 待删除会话的 id（null = 无删除确认弹窗） */
+  pendingDeleteId: string | null
+  /** 弹出删除确认（不直接删，防误操作） */
+  requestDeleteSession: (id: string) => void
+  /** 确认删除弹窗里的会话 */
+  confirmDeleteSession: () => Promise<void>
+  /** 关闭删除确认弹窗 */
+  cancelDeleteSession: () => void
 
   // 消息 — 按会话缓存（sessionId → 消息数组），未打开过的会话没有缓存
   messages: Record<string, UIMessage[]>
@@ -211,6 +219,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { sessions: newSessions, activeSessionId: newActiveId, messages }
     })
     if (newActiveId) void get().loadMessages(newActiveId)
+  },
+
+  // ---- 删除会话确认（弹窗流程）----
+  pendingDeleteId: null,
+  requestDeleteSession: (id) => set({ pendingDeleteId: id }),
+  cancelDeleteSession: () => set({ pendingDeleteId: null }),
+  confirmDeleteSession: async () => {
+    const id = get().pendingDeleteId
+    if (!id) return
+    set({ pendingDeleteId: null })
+    await get().deleteSession(id)
   },
 
   // ---- 消息（按会话缓存） ----

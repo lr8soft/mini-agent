@@ -13,6 +13,8 @@ export default {
     newSession: 'Neue Sitzung',
     noSessions: 'Keine Sitzungen',
     deleteSession: 'Sitzung löschen',
+    deleteSessionTitle: 'Diese Sitzung löschen?',
+    deleteSessionConfirm: 'Die Sitzung und alle ihre Nachrichten werden dauerhaft gelöscht.',
     running: 'Läuft',
     settings: 'Einstellungen'
   },
@@ -176,7 +178,9 @@ export default {
       maxRoundsHint: 'Max. Tool-Call-Runden pro Konversation (Standard 20). Beim Erreichen stoppt der Agent und schreibt eine Text-Zusammenfassung. 0 = unbegrenzt (Schleifendetektion gilt weiterhin).',
       roundsUnlimited: 'Unbegrenzt',
       agent: 'Agent-Verhalten',
-      agentHint: 'Sicherheitsnetz für die Tool-Call-Schleife: wiederholte identische Aufrufe lösen Warnungen / Hard-Stop; die Rundengrenze beendet die Ausführung mit automatischer Zusammenfassung.'
+      agentHint: 'Sicherheitsnetz für die Tool-Call-Schleife: wiederholte identische Aufrufe lösen Warnungen / Hard-Stop; die Rundengrenze beendet die Ausführung mit automatischer Zusammenfassung.',
+      memory: 'Langzeitgedächtnis',
+      memoryHint: 'Erfasst automatisch Präferenzen und Fakten aus Gesprächen, damit der Agent zukünftige Antworten personalisieren kann.'
     },
     usage: {
       hint: 'Token-Nutzungsstatistiken. Input/Output-Tokens werden automatisch für jeden LLM-Aufruf erfasst.',

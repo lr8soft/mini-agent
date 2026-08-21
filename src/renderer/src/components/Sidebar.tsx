@@ -10,7 +10,7 @@ export default function Sidebar() {
   const runningIds = useAppStore(s => s.runningIds)
   const view = useAppStore(s => s.view)
   // actions 引用稳定，从 getState 取（避免整 store 订阅导致流式期间高频重渲染）
-  const { setActiveSession, createSession, deleteSession, setView } = useAppStore.getState()
+  const { setActiveSession, createSession, requestDeleteSession, setView } = useAppStore.getState()
 
   return (
     <aside className="sidebar">
@@ -47,7 +47,8 @@ export default function Sidebar() {
               <span
                 className="session-delete"
                 title={t('sidebar.deleteSession')}
-                onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
+                // 弹确认框（防误操作），确认后才真正删除
+                onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id) }}
               >
                 <Trash2 size={12} />
               </span>
