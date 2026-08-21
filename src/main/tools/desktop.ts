@@ -11,16 +11,28 @@
 //    并在文本中同时报告图像尺寸与物理屏幕尺寸。
 // 4. 动作类 action 可带 after=true，执行后自动附带一张新截图，
 //    省掉模型"动作→截图确认"的额外回合。
-// 5. 输入/截图都走 robotjs（moveMouse/mouseClick/keyTap/screen.capture）。
-//    截图的缩放+PNG 编码在 desktopImage.ts（纯 JS，可单测）。
+//
+// 实现约束（实测踩坑记录）：
+// - 输入走 robotjs（moveMouse/mouseClick/keyTap/...）：纯 native 调用，
+//   不涉及内存 buffer，Electron 主进程内工作正常。
+// - 截图必须走 Electron desktopCapturer：robotjs screen.capture() 的 C++
+//   绑定返回"外部内存 buffer"，而 Electron 43 内置 Node 22 禁用外部 buffer，
+//   一调用就抛 "External buffers are not allowed"（robotjs 已停止维护，无法升级）。
+//   desktopCapturer 返回 NativeImage（Electron 内部管理），toPNG() 正常。
+// - 坐标空间：robotjs 鼠标坐标 = 物理像素（HiDPI 下 = 逻辑尺寸 × scaleFactor）。
+//   截图按主屏逻辑尺寸捕获（desktopCapturer 的屏幕源是逻辑空间），
+//   换算比例 = 主屏物理尺寸 / 图像尺寸。
 // ============================================================
+import { desktopCapturer, screen as electronScreen } from 'electron'
 import robot from 'robotjs'
 import type { ToolHandler } from './registry'
-import { resizeBgraToPngBase64, type RawBgraImage } from './desktopImage'
 
 export const DESKTOP_TOOL_NAME = 'desktop'
 
-/** 上一次截图的图像尺寸。LLM 坐标以此为基准空间；未截图前默认 1:1。 */
+/** 截图缩放后的最大宽度（像素）。超过则等比缩小。 */
+const MAX_IMAGE_WIDTH = 1280
+
+/** 上一次截图的图像尺寸。LLM 坐标以此为基准空间；未截图前默认 1:1（物理像素）。 */
 let lastImageSize = { width: 0, height: 0 }
 
 function sleep(ms: number): Promise<void> {
@@ -28,16 +40,26 @@ function sleep(ms: number): Promise<void> {
 }
 
 // ============================================================
-// 坐标换算
+// 屏幕/坐标
 // ============================================================
+
+/** 主屏物理像素尺寸（robotjs 鼠标坐标系所在空间） */
+export function getScreenPhysicalSize(): { width: number; height: number } {
+  const display = electronScreen.getPrimaryDisplay()
+  const scale = display.scaleFactor || 1
+  return {
+    width: Math.round(display.size.width * scale),
+    height: Math.round(display.size.height * scale)
+  }
+}
 
 /**
  * 缩放比例 = 物理屏幕 / 截图图像。
- * LLM 坐标（图像空间）× scale = 物理屏幕坐标。
+ * LLM 坐标（图像空间）× scale = 物理屏幕坐标（robotjs 空间）。
  * 无截图记录时返回 1:1（hasReference=false，坐标按物理屏幕解释）。
  */
 export function scaleFromImage(): { sx: number; sy: number; imgW: number; imgH: number; hasReference: boolean } {
-  const screen = robot.getScreenSize()
+  const screen = getScreenPhysicalSize()
   if (!lastImageSize.width || !lastImageSize.height) {
     return { sx: 1, sy: 1, imgW: screen.width, imgH: screen.height, hasReference: false }
   }
@@ -60,28 +82,53 @@ function isFiniteNum(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v)
 }
 
+// ============================================================
+// 截图（desktopCapturer → NativeImage.toPNG）
+// ============================================================
+
+/**
+ * 截取主屏，等比缩放到 ≤MAX_IMAGE_WIDTH 宽，返回 PNG base64 + 实际图像尺寸。
+ * 同时更新 lastImageSize（LLM 坐标基准空间）。
+ */
+export async function captureScreen(): Promise<{ base64: string; width: number; height: number }> {
+  const display = electronScreen.getPrimaryDisplay()
+  const logicalW = display.size.width
+  const logicalH = display.size.height
+  // 以逻辑尺寸捕获（desktopCapturer 屏幕源为逻辑空间），再限宽
+  const targetW = Math.min(MAX_IMAGE_WIDTH, logicalW)
+  const targetH = Math.max(1, Math.round((logicalH * targetW) / logicalW))
+
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width: targetW, height: targetH },
+    fetchWindowIcons: false
+  })
+  if (sources.length === 0) throw new Error('desktopCapturer 未返回任何屏幕源')
+
+  // 多屏时取第一个屏幕源（主屏）；NativeImage 尺寸已实测与请求一致
+  const img = sources[0].thumbnail
+  const actual = img.getSize()
+  const png = img.toPNG() // Buffer，PNG 数据（89 50 4E 47 开头，已实测）
+
+  lastImageSize = { width: actual.width, height: actual.height }
+  return { base64: png.toString('base64'), width: actual.width, height: actual.height }
+}
+
 /** 截图元信息文本（与图像一起返回，告知 LLM 坐标空间） */
 function screenshotMeta(width: number, height: number): string {
-  const screen = robot.getScreenSize()
+  const screen = getScreenPhysicalSize()
   const same = screen.width === width && screen.height === height
-  return `Screenshot: image ${width}x${height}px, physical screen ${screen.width}x${screen.height}px.${
+  return `Screenshot (primary screen): image ${width}x${height}px, physical screen ${screen.width}x${screen.height}px.${
     same
       ? ''
       : ' IMPORTANT: all action coordinates (click/drag/scroll) must be in THIS image\'s pixel space — the agent scales them to the physical screen automatically.'
   }`
 }
 
-/** 截图 → 缩放 → base64，并更新坐标基准 */
-function captureAndResize(img: RawBgraImage): { base64: string; width: number; height: number } {
-  const r = resizeBgraToPngBase64(img)
-  lastImageSize = { width: r.width, height: r.height }
-  return r
-}
-
 /** 执行动作后附带新截图（after=true 时使用） */
 async function withAfterScreenshot(text: string): Promise<string> {
   await sleep(50) // 给 UI 一点渲染时间
-  const { base64, width, height } = captureAndResize(robot.screen.capture())
+  const { base64, width, height } = await captureScreen()
   return `${text}\n__IMAGE_BASE64__:${base64}\n${screenshotMeta(width, height)}`
 }
 
@@ -109,7 +156,7 @@ export const desktopTool: ToolHandler = {
             type: 'string',
             enum: ['screenshot', 'left_click', 'right_click', 'middle_click', 'double_click', 'drag', 'scroll', 'type', 'key'],
             description:
-              'screenshot: capture the screen (returns an image). ' +
+              'screenshot: capture the primary screen (returns an image). ' +
               'left_click/right_click/middle_click/double_click: move to (x,y) in image pixels and click. ' +
               'drag: press at (x,y), move to (end_x,end_y), release. ' +
               'scroll: scroll by (scroll_x,scroll_y) at current cursor, or at (x,y) if provided. ' +
@@ -161,7 +208,7 @@ export const desktopTool: ToolHandler = {
       '\nNote: no screenshot has been taken yet in this session, so coordinates were interpreted as PHYSICAL screen pixels. For reliable targeting, take a screenshot first and use coordinates from that image.'
 
     if (action === 'screenshot') {
-      const { base64, width, height } = captureAndResize(robot.screen.capture())
+      const { base64, width, height } = await captureScreen()
       return `__IMAGE_BASE64__:${base64}\n${screenshotMeta(width, height)}`
     }
 
@@ -176,7 +223,7 @@ export const desktopTool: ToolHandler = {
         const double = action === 'double_click'
         const p = mapImageToScreen(pt.x, pt.y)
         const s = scaleFromImage()
-        const screen = robot.getScreenSize()
+        const screen = getScreenPhysicalSize()
         robot.moveMouse(p.x, p.y)
         robot.mouseClick(button, double)
         return wantAfter(
